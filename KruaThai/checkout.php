@@ -28,6 +28,7 @@ if (!isset($_SESSION['user_id'])) {
 // FIXED: Database connection - make $pdo available for header.php
 try {
     require_once 'config/database.php';
+    require_once 'ReferralManager.php';
     // Create database instance and get PDO connection
     $database = new Database();
     $pdo = $database->getConnection();
@@ -380,7 +381,6 @@ class OrderProcessor {
         ]);
     }
     
-    // UPDATED: Process orders with quantity support
     public function processFullOrder($user_id, $order, $postData) {
         $this->db->beginTransaction();
         
@@ -388,14 +388,10 @@ class OrderProcessor {
             $plan = $order['plan'];
             $selected_meals = $order['selected_meals'];
             $selected_meals_quantities = $order['selected_meals_quantities'] ?? [];
-            $delivery_date = $postData['delivery_day']; // Direct date from form (Y-m-d format)
-            
-            // Log quantities for debugging
-            error_log("Processing order with quantities: " . json_encode($selected_meals_quantities));
+            $delivery_date = $postData['delivery_day'];
             
             // Calculate dates
-            $start_date = $delivery_date; // Already in Y-m-d format
-            
+            $start_date = $delivery_date;
             $billing_cycle = ($plan['plan_type'] ?? 'weekly') === 'monthly' ? 'monthly' : 'weekly';
             $next_billing_date = $billing_cycle === 'monthly'
                 ? date('Y-m-d', strtotime('+1 month', strtotime($start_date)))
@@ -412,7 +408,7 @@ class OrderProcessor {
                 'next_billing_date' => $next_billing_date,
                 'billing_cycle' => $billing_cycle,
                 'total_amount' => $plan_price_value,
-                'delivery_days' => json_encode([$delivery_date]), // Array with the selected date
+                'delivery_days' => json_encode([$delivery_date]),
                 'preferred_time' => $postData['preferred_time'] ?? 'afternoon',
                 'delivery_instructions' => CheckoutUtils::sanitizeInput($postData['delivery_instructions'] ?? '')
             ];
@@ -432,7 +428,7 @@ class OrderProcessor {
             
             $payment_result = $this->createPayment($payment_data);
             
-            // Create subscription menus for delivery date - UPDATED FOR QUANTITIES
+            // Create subscription menus
             $this->createSubscriptionMenus($subscription_id, $selected_meals, $start_date, $selected_meals_quantities);
             
             // Update user profile
@@ -445,6 +441,15 @@ class OrderProcessor {
             
             $this->updateUserProfile($user_id, $user_data);
             
+            // *** FIXED REFERRAL PROCESSING - NO NESTED TRANSACTIONS ***
+            try {
+                $this->processReferralRewardWithoutTransaction($user_id, $subscription_id);
+            } catch (Exception $e) {
+                error_log("Referral processing error (non-fatal): " . $e->getMessage());
+                // Don't fail the entire checkout if referral processing fails
+            }
+            
+            // Commit the main transaction
             $this->db->commit();
             
             return [
@@ -455,6 +460,94 @@ class OrderProcessor {
             
         } catch (Exception $e) {
             $this->db->rollBack();
+            throw $e;
+        }
+    }
+
+    // ADD this new method to handle referrals WITHOUT separate transactions:
+    private function processReferralRewardWithoutTransaction($userId, $subscriptionId) {
+        try {
+            // Get user email to find referral
+            $stmt = $this->db->prepare("SELECT email FROM users WHERE id = ?");
+            $stmt->execute([$userId]);
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$user) {
+                return false;
+            }
+            
+            // Find pending referral for this email
+            $stmt = $this->db->prepare("
+                SELECT r.*, u.name as referrer_name, u.email as referrer_email
+                FROM referrals r
+                JOIN users u ON r.referrer_id = u.id
+                WHERE r.referred_email = ? 
+                AND r.status = 'pending'
+                AND r.expires_at > NOW()
+                LIMIT 1
+            ");
+            $stmt->execute([$user['email']]);
+            $referral = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$referral) {
+                return false; // No referral found
+            }
+            
+            // Update referral status
+            $stmt = $this->db->prepare("
+                UPDATE referrals 
+                SET status = 'completed', 
+                    referred_user_id = ?,
+                    completed_at = NOW(),
+                    updated_at = NOW()
+                WHERE id = ?
+            ");
+            $stmt->execute([$userId, $referral['id']]);
+            
+            // Get current referrer credits
+            $stmt = $this->db->prepare("
+                SELECT referral_credits, total_referrals, total_referral_earnings 
+                FROM users 
+                WHERE id = ?
+            ");
+            $stmt->execute([$referral['referrer_id']]);
+            $referrer = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            $current_credits = $referrer['referral_credits'] ?? 0;
+            $reward_amount = $referral['reward_amount'] ?? 10.00;
+            $new_credits = $current_credits + $reward_amount;
+            $new_total_referrals = ($referrer['total_referrals'] ?? 0) + 1;
+            $new_total_earnings = ($referrer['total_referral_earnings'] ?? 0) + $reward_amount;
+            
+            // Update referrer's credits and stats
+            $stmt = $this->db->prepare("
+                UPDATE users 
+                SET referral_credits = ?,
+                    total_referrals = ?,
+                    total_referral_earnings = ?,
+                    updated_at = NOW()
+                WHERE id = ?
+            ");
+            $stmt->execute([
+                $new_credits,
+                $new_total_referrals,
+                $new_total_earnings,
+                $referral['referrer_id']
+            ]);
+            
+            error_log("✅ Referral reward processed: User {$user['email']} referred by {$referral['referrer_name']}, reward: $" . $reward_amount);
+            
+            return [
+                'success' => true,
+                'referral_id' => $referral['id'],
+                'referrer_id' => $referral['referrer_id'],
+                'referrer_name' => $referral['referrer_name'],
+                'reward_amount' => $reward_amount,
+                'new_credits' => $new_credits
+            ];
+            
+        } catch (Exception $e) {
+            error_log("Referral processing error: " . $e->getMessage());
             throw $e;
         }
     }
