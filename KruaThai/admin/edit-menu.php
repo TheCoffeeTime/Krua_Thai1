@@ -1,8 +1,8 @@
 <?php
 /**
- * Krua Thai - Edit Menu Item
+ * Somdul Table - Edit Menu Item with Multiple Images Support
  * File: admin/edit-menu.php
- * Description: Complete form for editing existing menu items with nutrition tracking, ingredients, and image upload
+ * Description: Complete form for editing existing menu items with multiple image support
  */
 session_start();
 require_once '../config/database.php';
@@ -45,10 +45,12 @@ try {
     
     // Parse JSON fields
     $dietary_tags = $menu['dietary_tags'] ? json_decode($menu['dietary_tags'], true) : [];
+    $additional_images = $menu['additional_images'] ? json_decode($menu['additional_images'], true) : [];
     
     // Set form data to existing values
     $form_data = array_merge($menu, [
-        'dietary_tags' => $dietary_tags
+        'dietary_tags' => $dietary_tags,
+        'additional_images' => $additional_images
     ]);
     
 } catch (Exception $e) {
@@ -57,127 +59,186 @@ try {
 
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Get and sanitize form data
-    $form_data = [
-        'category_id' => sanitizeInput($_POST['category_id'] ?? ''),
-        'name' => sanitizeInput($_POST['name'] ?? ''),
-        'name_thai' => sanitizeInput($_POST['name_thai'] ?? ''),
-        'description' => sanitizeInput($_POST['description'] ?? ''),
-        'ingredients' => sanitizeInput($_POST['ingredients'] ?? ''),
-        'cooking_method' => sanitizeInput($_POST['cooking_method'] ?? ''),
-        'base_price' => sanitizeInput($_POST['base_price'] ?? ''),
-        'portion_size' => sanitizeInput($_POST['portion_size'] ?? 'Regular'),
-        'preparation_time' => sanitizeInput($_POST['preparation_time'] ?? '15'),
-        'calories_per_serving' => sanitizeInput($_POST['calories_per_serving'] ?? ''),
-        'protein_g' => sanitizeInput($_POST['protein_g'] ?? ''),
-        'carbs_g' => sanitizeInput($_POST['carbs_g'] ?? ''),
-        'fat_g' => sanitizeInput($_POST['fat_g'] ?? ''),
-        'fiber_g' => sanitizeInput($_POST['fiber_g'] ?? ''),
-        'sodium_mg' => sanitizeInput($_POST['sodium_mg'] ?? ''),
-        'sugar_g' => sanitizeInput($_POST['sugar_g'] ?? ''),
-        'spice_level' => sanitizeInput($_POST['spice_level'] ?? 'medium'),
-        'dietary_tags' => $_POST['dietary_tags'] ?? [],
-        'is_featured' => isset($_POST['is_featured']) ? 1 : 0,
-        'is_seasonal' => isset($_POST['is_seasonal']) ? 1 : 0,
-        'is_available' => isset($_POST['is_available']) ? 1 : 0,
-        'availability_start' => sanitizeInput($_POST['availability_start'] ?? ''),
-        'availability_end' => sanitizeInput($_POST['availability_end'] ?? ''),
-        'meta_description' => sanitizeInput($_POST['meta_description'] ?? '')
-    ];
-
-    // Validate required fields
-    if (empty($form_data['name'])) {
-        $errors[] = "Menu name is required";
-    }
-    
-    if (empty($form_data['base_price']) || !is_numeric($form_data['base_price'])) {
-        $errors[] = "Valid base price is required";
-    }
-
-    // Handle file upload
-    $main_image_url = $menu['main_image_url']; // Keep existing image by default
-    if (isset($_FILES['main_image']) && $_FILES['main_image']['error'] === UPLOAD_ERR_OK) {
-        $upload_result = handleImageUpload($_FILES['main_image'], 'menu_images');
-        if ($upload_result['success']) {
-            $main_image_url = $upload_result['file_path'];
-            // Delete old image if exists
-            if ($menu['main_image_url'] && file_exists('../' . $menu['main_image_url'])) {
-                unlink('../' . $menu['main_image_url']);
-            }
-        } else {
-            $errors[] = $upload_result['message'];
+    // Handle image deletion if requested
+    if (isset($_POST['delete_image'])) {
+        $image_to_delete = $_POST['delete_image'];
+        $current_additional_images = json_decode($menu['additional_images'] ?? '[]', true);
+        
+        // Remove the image from array
+        $updated_images = array_filter($current_additional_images, function($img) use ($image_to_delete) {
+            return $img !== $image_to_delete;
+        });
+        
+        // Delete physical file
+        if (file_exists('../' . $image_to_delete)) {
+            unlink('../' . $image_to_delete);
         }
-    }
+        
+        // Update database
+        $stmt = $pdo->prepare("UPDATE menus SET additional_images = ?, updated_at = NOW() WHERE id = ?");
+        $stmt->execute([json_encode(array_values($updated_images)), $menu_id]);
+        
+        $success_message = "Image deleted successfully!";
+        
+        // Refresh menu data
+        $stmt = $pdo->prepare("SELECT additional_images FROM menus WHERE id = ?");
+        $stmt->execute([$menu_id]);
+        $menu['additional_images'] = $stmt->fetchColumn();
+        $form_data['additional_images'] = json_decode($menu['additional_images'] ?? '[]', true);
+    } else {
+        // Regular form submission
+        // Get and sanitize form data
+        $form_data = [
+            'category_id' => sanitizeInput($_POST['category_id'] ?? ''),
+            'name' => sanitizeInput($_POST['name'] ?? ''),
+            'name_thai' => sanitizeInput($_POST['name_thai'] ?? ''),
+            'description' => sanitizeInput($_POST['description'] ?? ''),
+            'ingredients' => sanitizeInput($_POST['ingredients'] ?? ''),
+            'cooking_method' => sanitizeInput($_POST['cooking_method'] ?? ''),
+            'base_price' => sanitizeInput($_POST['base_price'] ?? ''),
+            'portion_size' => sanitizeInput($_POST['portion_size'] ?? 'Regular'),
+            'preparation_time' => sanitizeInput($_POST['preparation_time'] ?? '15'),
+            'calories_per_serving' => sanitizeInput($_POST['calories_per_serving'] ?? ''),
+            'protein_g' => sanitizeInput($_POST['protein_g'] ?? ''),
+            'carbs_g' => sanitizeInput($_POST['carbs_g'] ?? ''),
+            'fat_g' => sanitizeInput($_POST['fat_g'] ?? ''),
+            'fiber_g' => sanitizeInput($_POST['fiber_g'] ?? ''),
+            'sodium_mg' => sanitizeInput($_POST['sodium_mg'] ?? ''),
+            'sugar_g' => sanitizeInput($_POST['sugar_g'] ?? ''),
+            'spice_level' => sanitizeInput($_POST['spice_level'] ?? 'medium'),
+            'dietary_tags' => $_POST['dietary_tags'] ?? [],
+            'is_featured' => isset($_POST['is_featured']) ? 1 : 0,
+            'is_seasonal' => isset($_POST['is_seasonal']) ? 1 : 0,
+            'is_available' => isset($_POST['is_available']) ? 1 : 0,
+            'availability_start' => sanitizeInput($_POST['availability_start'] ?? ''),
+            'availability_end' => sanitizeInput($_POST['availability_end'] ?? ''),
+            'meta_description' => sanitizeInput($_POST['meta_description'] ?? '')
+        ];
 
-    // Update menu if no errors
-    if (empty($errors)) {
-        try {
-            $pdo->beginTransaction();
+        // Validate required fields
+        if (empty($form_data['name'])) {
+            $errors[] = "Menu name is required";
+        }
+        
+        if (empty($form_data['base_price']) || !is_numeric($form_data['base_price'])) {
+            $errors[] = "Valid base price is required";
+        }
 
-            // Generate slug from name
-            $slug = generateSlug($form_data['name']);
-            
-            // Convert arrays to JSON
-            $dietary_tags_json = !empty($form_data['dietary_tags']) ? json_encode($form_data['dietary_tags']) : null;
+        // Handle main image upload
+        $main_image_url = $menu['main_image_url']; // Keep existing image by default
+        if (isset($_FILES['main_image']) && $_FILES['main_image']['error'] === UPLOAD_ERR_OK) {
+            $upload_result = handleImageUpload($_FILES['main_image'], 'menu_images');
+            if ($upload_result['success']) {
+                $main_image_url = $upload_result['file_path'];
+                // Delete old image if exists
+                if ($menu['main_image_url'] && file_exists('../' . $menu['main_image_url'])) {
+                    unlink('../' . $menu['main_image_url']);
+                }
+            } else {
+                $errors[] = $upload_result['message'];
+            }
+        }
 
-            // Update menu
-            $menu_sql = "
-                UPDATE menus SET 
-                    category_id = ?, name = ?, name_thai = ?, description = ?, ingredients = ?, 
-                    cooking_method = ?, main_image_url = ?, base_price = ?, portion_size = ?, 
-                    preparation_time = ?, calories_per_serving = ?, protein_g = ?, carbs_g = ?, 
-                    fat_g = ?, fiber_g = ?, sodium_mg = ?, sugar_g = ?, 
-                    dietary_tags = ?, spice_level = ?, is_featured = ?, is_seasonal = ?, 
-                    is_available = ?, availability_start = ?, availability_end = ?, slug = ?, 
-                    meta_description = ?, updated_at = NOW()
-                WHERE id = ?
-            ";
+        // Handle additional images upload
+        $current_additional_images = json_decode($menu['additional_images'] ?? '[]', true);
+        $new_additional_images = $current_additional_images;
 
-            $stmt = $pdo->prepare($menu_sql);
-            $stmt->execute([
-                $form_data['category_id'] ?: null,
-                $form_data['name'],
-                $form_data['name_thai'] ?: null,
-                $form_data['description'] ?: null,
-                $form_data['ingredients'] ?: null,
-                $form_data['cooking_method'] ?: null,
-                $main_image_url ?: null,
-                $form_data['base_price'],
-                $form_data['portion_size'],
-                $form_data['preparation_time'],
-                $form_data['calories_per_serving'] ?: null,
-                $form_data['protein_g'] ?: null,
-                $form_data['carbs_g'] ?: null,
-                $form_data['fat_g'] ?: null,
-                $form_data['fiber_g'] ?: null,
-                $form_data['sodium_mg'] ?: null,
-                $form_data['sugar_g'] ?: null,
-                $dietary_tags_json,
-                $form_data['spice_level'],
-                $form_data['is_featured'],
-                $form_data['is_seasonal'],
-                $form_data['is_available'],
-                $form_data['availability_start'] ?: null,
-                $form_data['availability_end'] ?: null,
-                $slug,
-                $form_data['meta_description'] ?: null,
-                $menu_id
-            ]);
+        if (isset($_FILES['additional_images']) && is_array($_FILES['additional_images']['name'])) {
+            foreach ($_FILES['additional_images']['name'] as $key => $name) {
+                if ($_FILES['additional_images']['error'][$key] === UPLOAD_ERR_OK) {
+                    $file = [
+                        'name' => $_FILES['additional_images']['name'][$key],
+                        'type' => $_FILES['additional_images']['type'][$key],
+                        'tmp_name' => $_FILES['additional_images']['tmp_name'][$key],
+                        'error' => $_FILES['additional_images']['error'][$key],
+                        'size' => $_FILES['additional_images']['size'][$key]
+                    ];
+                    
+                    $upload_result = handleImageUpload($file, 'menu_images');
+                    if ($upload_result['success']) {
+                        $new_additional_images[] = $upload_result['file_path'];
+                    } else {
+                        $errors[] = "Additional image upload error: " . $upload_result['message'];
+                    }
+                }
+            }
+        }
 
-            $pdo->commit();
+        // Update menu if no errors
+        if (empty($errors)) {
+            try {
+                $pdo->beginTransaction();
 
-            // Log activity
-            logActivity('menu_updated', $_SESSION['user_id'], getRealIPAddress(), [
-                'menu_id' => $menu_id,
-                'menu_name' => $form_data['name']
-            ]);
+                // Generate slug from name
+                $slug = generateSlug($form_data['name']);
+                
+                // Convert arrays to JSON
+                $dietary_tags_json = !empty($form_data['dietary_tags']) ? json_encode($form_data['dietary_tags']) : null;
+                $additional_images_json = !empty($new_additional_images) ? json_encode($new_additional_images) : null;
 
-            $success_message = "Menu item '{$form_data['name']}' has been updated successfully!";
+                // Update menu
+                $menu_sql = "
+                    UPDATE menus SET 
+                        category_id = ?, name = ?, name_thai = ?, description = ?, ingredients = ?, 
+                        cooking_method = ?, main_image_url = ?, additional_images = ?, base_price = ?, portion_size = ?, 
+                        preparation_time = ?, calories_per_serving = ?, protein_g = ?, carbs_g = ?, 
+                        fat_g = ?, fiber_g = ?, sodium_mg = ?, sugar_g = ?, 
+                        dietary_tags = ?, spice_level = ?, is_featured = ?, is_seasonal = ?, 
+                        is_available = ?, availability_start = ?, availability_end = ?, slug = ?, 
+                        meta_description = ?, updated_at = NOW()
+                    WHERE id = ?
+                ";
 
-        } catch (Exception $e) {
-            $pdo->rollBack();
-            $errors[] = "Error updating menu item: " . $e->getMessage();
-            error_log("Menu update error: " . $e->getMessage());
+                $stmt = $pdo->prepare($menu_sql);
+                $stmt->execute([
+                    $form_data['category_id'] ?: null,
+                    $form_data['name'],
+                    $form_data['name_thai'] ?: null,
+                    $form_data['description'] ?: null,
+                    $form_data['ingredients'] ?: null,
+                    $form_data['cooking_method'] ?: null,
+                    $main_image_url ?: null,
+                    $additional_images_json,
+                    $form_data['base_price'],
+                    $form_data['portion_size'],
+                    $form_data['preparation_time'],
+                    $form_data['calories_per_serving'] ?: null,
+                    $form_data['protein_g'] ?: null,
+                    $form_data['carbs_g'] ?: null,
+                    $form_data['fat_g'] ?: null,
+                    $form_data['fiber_g'] ?: null,
+                    $form_data['sodium_mg'] ?: null,
+                    $form_data['sugar_g'] ?: null,
+                    $dietary_tags_json,
+                    $form_data['spice_level'],
+                    $form_data['is_featured'],
+                    $form_data['is_seasonal'],
+                    $form_data['is_available'],
+                    $form_data['availability_start'] ?: null,
+                    $form_data['availability_end'] ?: null,
+                    $slug,
+                    $form_data['meta_description'] ?: null,
+                    $menu_id
+                ]);
+
+                $pdo->commit();
+
+                // Log activity
+                logActivity('menu_updated', $_SESSION['user_id'], getRealIPAddress(), [
+                    'menu_id' => $menu_id,
+                    'menu_name' => $form_data['name']
+                ]);
+
+                $success_message = "Menu item '{$form_data['name']}' has been updated successfully!";
+                
+                // Update form_data with new additional images for display
+                $form_data['additional_images'] = $new_additional_images;
+
+            } catch (Exception $e) {
+                $pdo->rollBack();
+                $errors[] = "Error updating menu item: " . $e->getMessage();
+                error_log("Menu update error: " . $e->getMessage());
+            }
         }
     }
 }
@@ -193,8 +254,6 @@ try {
     error_log("Error fetching categories: " . $e->getMessage());
 }
 
-
-
 // Dietary tags options
 $dietary_tags_options = [
     'vegetarian' => 'Vegetarian',
@@ -207,7 +266,7 @@ $dietary_tags_options = [
     'organic' => 'Organic',
     'locally_sourced' => 'Locally Sourced',
     'halal' => 'Halal',
-    'Kids_meal' => 'Kids meal'
+    'kids_meal' => 'Kids Meal'
 ];
 
 // Image upload function
@@ -254,15 +313,15 @@ function generateSlug($text) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Edit Menu - Krua Thai Admin</title>
+    <title>Edit Menu - Somdul Table Admin</title>
     <link href="https://fonts.googleapis.com/css2?family=Batica+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         :root {
-            --rice: #bd9379;
-            --family: #ece8e1;
-            --herb: #adb89d;
-            --thai-curry: #cf723a;
+            --brown: #bd9379;
+            --cream: #ece8e1;
+            --sage: #adb89d;
+            --curry: #cf723a;
             --white: #ffffff;
             --text-dark: #2c3e50;
             --text-gray: #7f8c8d;
@@ -283,7 +342,7 @@ function generateSlug($text) {
 
         body {
             font-family: 'Batica Sans', sans-serif;
-            background: linear-gradient(135deg, var(--family) 0%, #f8f6f3 100%);
+            background: linear-gradient(135deg, var(--cream) 0%, #f8f6f3 100%);
             color: var(--text-dark);
             line-height: 1.6;
         }
@@ -296,7 +355,7 @@ function generateSlug($text) {
         /* Sidebar */
         .sidebar {
             width: 280px;
-            background: linear-gradient(135deg, var(--rice) 0%, var(--thai-curry) 100%);
+            background: linear-gradient(135deg, var(--brown) 0%, var(--curry) 100%);
             color: var(--white);
             position: fixed;
             height: 100vh;
@@ -463,7 +522,7 @@ function generateSlug($text) {
         }
 
         .btn-primary {
-            background: linear-gradient(135deg, var(--thai-curry), #e67e22);
+            background: linear-gradient(135deg, var(--curry), #e67e22);
             color: var(--white);
             box-shadow: var(--shadow-soft);
         }
@@ -481,18 +540,23 @@ function generateSlug($text) {
         }
 
         .btn-secondary:hover {
-            background: var(--family);
+            background: var(--cream);
             transform: translateY(-1px);
         }
 
         .btn-success {
-            background: linear-gradient(135deg, var(--herb), #27ae60);
+            background: linear-gradient(135deg, var(--sage), #27ae60);
             color: var(--white);
         }
 
         .btn-danger {
             background: linear-gradient(135deg, #e74c3c, #c0392b);
             color: var(--white);
+        }
+
+        .btn-small {
+            padding: 0.4rem 0.8rem;
+            font-size: 0.8rem;
         }
 
         /* Form Layout */
@@ -529,7 +593,7 @@ function generateSlug($text) {
         .section-title {
             font-size: 1.25rem;
             font-weight: 600;
-            color: var(--thai-curry);
+            color: var(--curry);
             margin-bottom: 1.5rem;
             display: flex;
             align-items: center;
@@ -568,7 +632,7 @@ function generateSlug($text) {
 
         .form-control:focus {
             outline: none;
-            border-color: var(--thai-curry);
+            border-color: var(--curry);
             box-shadow: 0 0 0 3px rgba(207, 114, 58, 0.1);
         }
 
@@ -604,12 +668,12 @@ function generateSlug($text) {
             border-radius: var(--radius-sm);
             color: var(--text-gray);
             transition: var(--transition);
-            background: var(--family);
+            background: var(--cream);
         }
 
         .file-upload:hover .file-upload-label {
-            border-color: var(--thai-curry);
-            color: var(--thai-curry);
+            border-color: var(--curry);
+            color: var(--curry);
         }
 
         .current-image {
@@ -618,6 +682,66 @@ function generateSlug($text) {
             height: auto;
             border-radius: var(--radius-sm);
             margin-bottom: 1rem;
+        }
+
+        /* Additional Images Section */
+        .additional-images-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .image-item {
+            position: relative;
+            border-radius: var(--radius-sm);
+            overflow: hidden;
+            background: var(--cream);
+        }
+
+        .image-item img {
+            width: 100%;
+            height: 120px;
+            object-fit: cover;
+            display: block;
+        }
+
+        .image-delete-btn {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            background: rgba(231, 76, 60, 0.9);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: var(--transition);
+            font-size: 0.8rem;
+        }
+
+        .image-delete-btn:hover {
+            background: #e74c3c;
+            transform: scale(1.1);
+        }
+
+        /* Multiple File Upload */
+        .multiple-file-upload {
+            position: relative;
+            width: 100%;
+        }
+
+        .multiple-file-upload input[type="file"] {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px dashed var(--border-light);
+            border-radius: var(--radius-sm);
+            background: var(--cream);
+            cursor: pointer;
         }
 
         /* Checkbox Groups */
@@ -637,13 +761,13 @@ function generateSlug($text) {
         }
 
         .checkbox-item:hover {
-            background: var(--family);
+            background: var(--cream);
         }
 
         .checkbox-item input[type="checkbox"] {
             width: 16px;
             height: 16px;
-            accent-color: var(--thai-curry);
+            accent-color: var(--curry);
         }
 
         .checkbox-item label {
@@ -662,7 +786,7 @@ function generateSlug($text) {
         }
 
         .preview-header {
-            background: linear-gradient(135deg, var(--family), #f5f2ef);
+            background: linear-gradient(135deg, var(--cream), #f5f2ef);
             padding: 1.5rem;
             border-bottom: 1px solid var(--border-light);
         }
@@ -686,7 +810,7 @@ function generateSlug($text) {
 
         .menu-preview-image {
             height: 150px;
-            background: linear-gradient(135deg, var(--family), #f5f2ef);
+            background: linear-gradient(135deg, var(--cream), #f5f2ef);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -714,7 +838,7 @@ function generateSlug($text) {
         .menu-preview-price {
             font-size: 1.1rem;
             font-weight: 700;
-            color: var(--thai-curry);
+            color: var(--curry);
             margin-bottom: 0.5rem;
         }
 
@@ -782,6 +906,10 @@ function generateSlug($text) {
                 align-items: flex-start;
                 gap: 1rem;
             }
+
+            .additional-images-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
         }
     </style>
 </head>
@@ -791,11 +919,11 @@ function generateSlug($text) {
         <div class="sidebar">
             <div class="sidebar-header">
                 <div class="logo">
-                    <img src="../assets/image/LOGO_White Trans.png" 
-                         alt="Krua Thai Logo" 
+                    <img src="../assets/image/LOGO_BG2.png" 
+                         alt="Somdul Table Logo" 
                          class="logo-image">
                 </div>
-                <div class="sidebar-title">Krua Thai</div>
+                <div class="sidebar-title">Somdul Table</div>
                 <div class="sidebar-subtitle">Admin Panel</div>
             </div>
             
@@ -865,10 +993,10 @@ function generateSlug($text) {
                 <div class="header-content">
                     <div>
                         <h1 class="page-title">
-                            <i class="fas fa-edit" style="color: var(--thai-curry); margin-right: 0.5rem;"></i>
+                            <i class="fas fa-edit" style="color: var(--curry); margin-right: 0.5rem;"></i>
                             Edit Menu Item
                         </h1>
-                        <p class="page-subtitle">Update your delicious Thai menu item details</p>
+                        <p class="page-subtitle">Update your delicious Thai menu item details and images</p>
                     </div>
                     <div class="header-actions">
                         <a href="menus.php" class="btn btn-secondary">
@@ -966,7 +1094,7 @@ function generateSlug($text) {
 
                             <div class="form-row">
                                 <div class="form-group">
-                                    <label for="base_price" class="form-label">Price (THB) *</label>
+                                    <label for="base_price" class="form-label">Price (USD) *</label>
                                     <input type="number" 
                                            id="base_price" 
                                            name="base_price" 
@@ -1011,36 +1139,67 @@ function generateSlug($text) {
                             </div>
                         </div>
 
-                        <!-- Image Upload -->
+                        <!-- Image Upload Section -->
                         <div class="form-section">
                             <h3 class="section-title">
                                 <i class="fas fa-image"></i>
-                                Menu Image
+                                Menu Images
                             </h3>
                             
-                            <?php if (!empty($form_data['main_image_url'])): ?>
-                                <div class="form-group">
-                                    <label class="form-label">Current Image</label>
-                                    <img src="../<?= htmlspecialchars($form_data['main_image_url']) ?>" 
-                                         alt="Current menu image" 
-                                         class="current-image">
-                                </div>
-                            <?php endif; ?>
-                            
+                            <!-- Main Image -->
                             <div class="form-group">
-                                <label for="main_image" class="form-label">Update Image</label>
+                                <label class="form-label">Main Image</label>
+                                <?php if (!empty($form_data['main_image_url'])): ?>
+                                    <img src="../<?= htmlspecialchars($form_data['main_image_url']) ?>" 
+                                         alt="Current main image" 
+                                         class="current-image">
+                                <?php endif; ?>
+                                
                                 <div class="file-upload">
                                     <input type="file" 
                                            id="main_image" 
                                            name="main_image" 
                                            accept="image/*" 
-                                           onchange="previewImage(this)">
+                                           onchange="previewMainImage(this)">
                                     <div class="file-upload-label">
                                         <i class="fas fa-cloud-upload-alt"></i>
-                                        <span>Click to upload new image</span>
+                                        <span>Click to upload main image</span>
                                     </div>
                                 </div>
                                 <div class="form-help">JPG, PNG, GIF, or WebP. Maximum 5MB.</div>
+                            </div>
+
+                            <!-- Additional Images -->
+                            <div class="form-group">
+                                <label class="form-label">Additional Images</label>
+                                
+                                <!-- Existing Additional Images -->
+                                <?php if (!empty($form_data['additional_images'])): ?>
+                                    <div class="additional-images-grid">
+                                        <?php foreach ($form_data['additional_images'] as $image): ?>
+                                            <div class="image-item">
+                                                <img src="../<?= htmlspecialchars($image) ?>" alt="Additional image">
+                                                <form method="POST" style="display: inline;">
+                                                    <input type="hidden" name="delete_image" value="<?= htmlspecialchars($image) ?>">
+                                                    <button type="submit" class="image-delete-btn" 
+                                                            onclick="return confirm('Are you sure you want to delete this image?')">
+                                                        <i class="fas fa-times"></i>
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        <?php endforeach; ?>
+                                    </div>
+                                <?php endif; ?>
+
+                                <!-- Upload New Additional Images -->
+                                <div class="multiple-file-upload">
+                                    <input type="file" 
+                                           id="additional_images" 
+                                           name="additional_images[]" 
+                                           accept="image/*" 
+                                           multiple>
+                                    <div class="form-help">Hold Ctrl/Cmd to select multiple images. JPG, PNG, GIF, or WebP. Maximum 5MB each.</div>
+                                </div>
                             </div>
                         </div>
 
@@ -1161,7 +1320,6 @@ function generateSlug($text) {
                             </div>
                         </div>
 
-                     
                         <!-- Dietary Tags -->
                         <div class="form-section">
                             <h3 class="section-title">
@@ -1248,7 +1406,7 @@ function generateSlug($text) {
                                             <?= htmlspecialchars($form_data['name'] ?? 'Menu Name') ?>
                                         </h4>
                                         <div class="menu-preview-price" id="previewPrice">
-                                            ฿<?= htmlspecialchars($form_data['base_price'] ?? '0') ?>
+                                            $<?= htmlspecialchars($form_data['base_price'] ?? '0') ?>
                                         </div>
                                         <p class="menu-preview-description" id="previewDescription">
                                             <?= htmlspecialchars($form_data['description'] ?? 'Menu description will appear here...') ?>
@@ -1324,12 +1482,12 @@ function generateSlug($text) {
             const description = document.getElementById('description').value || 'Menu description will appear here...';
             
             document.getElementById('previewTitle').textContent = name;
-            document.getElementById('previewPrice').textContent = '฿' + price;
+            document.getElementById('previewPrice').textContent = '$' + price;
             document.getElementById('previewDescription').textContent = description;
         }
 
-        // Preview image function
-        function previewImage(input) {
+        // Preview main image function
+        function previewMainImage(input) {
             if (input.files && input.files[0]) {
                 const reader = new FileReader();
                 reader.onload = function(e) {
@@ -1360,10 +1518,22 @@ function generateSlug($text) {
             }
         });
 
+        // File input styling for additional images
+        document.getElementById('additional_images').addEventListener('change', function() {
+            const fileCount = this.files.length;
+            const label = this.nextElementSibling;
+            
+            if (fileCount > 0) {
+                label.textContent = `${fileCount} image(s) selected`;
+            } else {
+                label.textContent = 'Hold Ctrl/Cmd to select multiple images. JPG, PNG, GIF, or WebP. Maximum 5MB each.';
+            }
+        });
+
         // Initialize preview
         updatePreview();
 
-        console.log('Krua Thai Edit Menu initialized successfully');
+        console.log('Somdul Table Edit Menu with Multiple Images initialized successfully');
     </script>
 </body>
 </html>

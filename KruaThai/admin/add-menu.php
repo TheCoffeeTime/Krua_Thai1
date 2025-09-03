@@ -1,8 +1,8 @@
-   <?php
+<?php
 /**
- * Krua Thai - Add New Menu Item
+ * Somdul Table - Add New Menu Item (Updated with Multiple Image Support)
  * File: admin/add-menu.php
- * Description: Complete form for adding new menu items with nutrition tracking, ingredients, and image upload
+ * Description: Complete form for adding new menu items with multiple image uploads, nutrition tracking, ingredients
  */
 session_start();
 require_once '../config/database.php';
@@ -82,7 +82,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // Handle image upload
+    // Handle main image upload
     $main_image_url = '';
     if (isset($_FILES['main_image']) && $_FILES['main_image']['error'] === UPLOAD_ERR_OK) {
         $upload_result = handleImageUpload($_FILES['main_image']);
@@ -90,6 +90,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $main_image_url = $upload_result['file_path'];
         } else {
             $errors[] = $upload_result['message'];
+        }
+    }
+
+    // Handle multiple gallery images upload
+    $gallery_images = [];
+    $additional_images = [];
+    
+    if (isset($_FILES['gallery_images']) && is_array($_FILES['gallery_images']['name'])) {
+        $file_count = count($_FILES['gallery_images']['name']);
+        
+        for ($i = 0; $i < $file_count; $i++) {
+            if ($_FILES['gallery_images']['error'][$i] === UPLOAD_ERR_OK) {
+                $file = [
+                    'name' => $_FILES['gallery_images']['name'][$i],
+                    'type' => $_FILES['gallery_images']['type'][$i],
+                    'tmp_name' => $_FILES['gallery_images']['tmp_name'][$i],
+                    'error' => $_FILES['gallery_images']['error'][$i],
+                    'size' => $_FILES['gallery_images']['size'][$i]
+                ];
+                
+                $upload_result = handleImageUpload($file);
+                if ($upload_result['success']) {
+                    $gallery_images[] = $upload_result['file_path'];
+                    $additional_images[] = $upload_result['file_path'];
+                } else {
+                    $errors[] = "Gallery image " . ($i + 1) . ": " . $upload_result['message'];
+                }
+            }
         }
     }
 
@@ -101,21 +129,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Generate slug
             $slug = generateSlug($form_data['name']);
 
-            // Prepare health benefits and dietary tags as JSON
-            
+            // Prepare JSON data
             $dietary_tags_json = !empty($form_data['dietary_tags']) ? json_encode($form_data['dietary_tags']) : null;
+            $gallery_images_json = !empty($gallery_images) ? json_encode($gallery_images) : null;
+            $additional_images_json = !empty($additional_images) ? json_encode($additional_images) : null;
 
-            // Insert menu
+            // Insert menu with multiple image support
             $menu_sql = "
                 INSERT INTO menus (
                     id, category_id, name, name_thai, description, ingredients, cooking_method,
-                    main_image_url, base_price, portion_size, preparation_time,
+                    main_image_url, gallery_images, additional_images, base_price, portion_size, preparation_time,
                     calories_per_serving, protein_g, carbs_g, fat_g, fiber_g, sodium_mg, sugar_g,
                     dietary_tags, spice_level, is_featured, 
-                     slug, meta_description,
+                    slug, meta_description,
                     is_available, created_at, updated_at
                 ) VALUES (
-                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,   1, NOW(), NOW()
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW(), NOW()
                 )
             ";
 
@@ -130,6 +159,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $form_data['ingredients'] ?: null,
                 $form_data['cooking_method'] ?: null,
                 $main_image_url ?: null,
+                $gallery_images_json,
+                $additional_images_json,
                 $form_data['base_price'],
                 $form_data['portion_size'],
                 $form_data['preparation_time'],
@@ -152,10 +183,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Log activity
             logActivity('menu_created', $_SESSION['user_id'], getRealIPAddress(), [
                 'menu_id' => $menu_id,
-                'menu_name' => $form_data['name']
+                'menu_name' => $form_data['name'],
+                'images_count' => count($gallery_images) + ($main_image_url ? 1 : 0)
             ]);
 
-            $success_message = "Menu item '{$form_data['name']}' has been created successfully!";
+            $success_message = "Menu item '{$form_data['name']}' has been created successfully with " . (count($gallery_images) + ($main_image_url ? 1 : 0)) . " images!";
             $form_data = []; // Clear form data on success
 
         } catch (Exception $e) {
@@ -185,7 +217,7 @@ function handleImageUpload($file) {
     }
 
     $file_extension = pathinfo($file['name'], PATHINFO_EXTENSION);
-    $filename = uniqid('menu_') . '.' . $file_extension;
+    $filename = uniqid('menu_') . '_' . time() . '.' . $file_extension;
     $file_path = $upload_dir . $filename;
 
     if (move_uploaded_file($file['tmp_name'], $file_path)) {
@@ -214,7 +246,6 @@ try {
     error_log("Error fetching categories: " . $e->getMessage());
 }
 
-
 $dietary_tags_options = [
     'vegetarian' => 'Vegetarian',
     'vegan' => 'Vegan',
@@ -226,16 +257,16 @@ $dietary_tags_options = [
     'high_protein' => 'High Protein',
     'diabetic_friendly' => 'Diabetic-Friendly',
     'heart_healthy' => 'Heart Healthy',
-    'Kids_meal' => 'Kids meal'
+    'kids_meal' => 'Kids meal'
 ];
 ?>
 
 <!DOCTYPE html>
-<html lang="th">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Add New Menu - Krua Thai Admin</title>
+    <title>Add New Menu - Somdul Table Admin</title>
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -266,7 +297,7 @@ $dietary_tags_options = [
         }
 
         body {
-            font-family: 'Sarabun', sans-serif;
+            font-family: 'BaticaSans', 'Sarabun', sans-serif;
             background: linear-gradient(135deg, var(--cream) 0%, #f8f6f3 100%);
             color: var(--text-dark);
             line-height: 1.6;
@@ -633,6 +664,73 @@ $dietary_tags_options = [
             font-size: 0.9rem;
         }
 
+        /* Multiple File Upload Styles */
+        .multiple-file-upload {
+            border: 2px dashed var(--curry);
+            border-radius: var(--radius-sm);
+            padding: 2rem;
+            text-align: center;
+            background: rgba(207, 114, 58, 0.05);
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .multiple-file-upload:hover {
+            background: rgba(207, 114, 58, 0.1);
+        }
+
+        .upload-hint {
+            color: var(--text-gray);
+            font-size: 0.85rem;
+            margin-top: 0.5rem;
+        }
+
+        /* Image Preview Grid */
+        .image-preview-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .preview-image-container {
+            position: relative;
+            aspect-ratio: 1;
+            border-radius: var(--radius-sm);
+            overflow: hidden;
+            border: 2px solid var(--border-light);
+            background: #f8f9fa;
+        }
+
+        .preview-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .remove-image-btn {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: rgba(231, 76, 60, 0.9);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition);
+        }
+
+        .remove-image-btn:hover {
+            background: #e74c3c;
+            transform: scale(1.1);
+        }
+
         /* Checkbox Groups */
         .checkbox-group {
             display: grid;
@@ -734,6 +832,7 @@ $dietary_tags_options = [
             justify-content: center;
             color: var(--text-gray);
             font-size: 2rem;
+            position: relative;
         }
 
         .menu-preview-body {
@@ -787,6 +886,27 @@ $dietary_tags_options = [
 
         .nutrition-label {
             color: var(--text-gray);
+        }
+
+        /* Preview Gallery */
+        .preview-gallery {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+
+        .preview-gallery-image {
+            aspect-ratio: 1;
+            border-radius: 4px;
+            overflow: hidden;
+            background: var(--cream);
+        }
+
+        .preview-gallery-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
         }
 
         /* Form Actions */
@@ -875,7 +995,8 @@ $dietary_tags_options = [
             .page-header {
                 padding: 1.5rem;
             }
-.header-content {
+
+            .header-content {
                 flex-direction: column;
                 align-items: flex-start;
                 gap: 1rem;
@@ -898,6 +1019,10 @@ $dietary_tags_options = [
                 position: static;
                 margin-top: 2rem;
             }
+
+            .image-preview-grid {
+                grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+            }
         }
 
         /* Utilities */
@@ -916,12 +1041,12 @@ $dietary_tags_options = [
         <div class="sidebar" id="sidebar">
             <div class="sidebar-header">
                 <div class="logo">
-                    <img src="../assets/image/LOGO_White Trans.png" 
-                         alt="Krua Thai Logo" 
+                    <img src="../assets/image/LOGO_BG2.png" 
+                         alt="Somdul Table Logo" 
                          class="logo-image"
                          loading="lazy">
                 </div>
-                <div class="sidebar-title">Krua Thai</div>
+                <div class="sidebar-title">Somdul Table</div>
                 <div class="sidebar-subtitle">Admin Panel</div>
             </div>
             
@@ -1006,7 +1131,7 @@ $dietary_tags_options = [
                             <i class="fas fa-plus" style="color: var(--curry); margin-right: 0.5rem;"></i>
                             Add New Menu Item
                         </h1>
-                        <p class="page-subtitle">Create a delicious new Thai dish for your customers</p>
+                        <p class="page-subtitle">Create a delicious new Thai dish with multiple images</p>
                     </div>
                     <div class="header-actions">
                         <a href="menus.php" class="btn btn-secondary">
@@ -1057,7 +1182,7 @@ $dietary_tags_options = [
                             <i class="fas fa-utensils" style="color: var(--curry); margin-right: 0.5rem;"></i>
                             Menu Information
                         </h2>
-                        <p class="form-description">Fill in the details for your new menu item. Required fields are marked with *</p>
+                        <p class="form-description">Fill in the details for your new menu item. Upload multiple images to showcase your dish. Required fields are marked with *</p>
                     </div>
 
                     <div class="form-body">
@@ -1112,7 +1237,7 @@ $dietary_tags_options = [
                                             </select>
                                         </div>
                                         <div class="form-group">
-                                            <label for="base_price" class="form-label">Price (THB) <span class="required">*</span></label>
+                                            <label for="base_price" class="form-label">Price ($) <span class="required">*</span></label>
                                             <input type="number" 
                                                    id="base_price" 
                                                    name="base_price" 
@@ -1168,28 +1293,56 @@ $dietary_tags_options = [
                                     </div>
                                 </div>
 
-                                <!-- Image Upload -->
+                                <!-- Image Upload Sections -->
                                 <div class="form-section">
                                     <h3 class="section-title">
                                         <i class="fas fa-image"></i>
-                                        Menu Image
+                                        Menu Images
                                     </h3>
                                     
+                                    <!-- Main Image Upload -->
                                     <div class="form-group">
+                                        <label class="form-label">Main Image</label>
                                         <label class="file-upload">
-                                            <input type="file" name="main_image" accept="image/*" onchange="previewImage(this)">
+                                            <input type="file" name="main_image" accept="image/*" onchange="previewMainImage(this)">
                                             <div class="file-upload-icon">
-                                                <i class="fas fa-cloud-upload-alt"></i>
+                                                <i class="fas fa-camera"></i>
                                             </div>
                                             <div class="file-upload-text">
-                                                <strong>Click to upload image</strong><br>
-                                                or drag and drop<br>
-                                                <small>JPG, PNG, GIF or WebP (Max 5MB)</small>
+                                                <strong>Click to upload main image</strong><br>
+                                                JPG, PNG, GIF or WebP (Max 5MB)
                                             </div>
                                         </label>
-                                        <div id="imagePreviewContainer" class="d-none" style="margin-top: 1rem;">
-                                            <img id="imagePreview" style="max-width: 200px; border-radius: var(--radius-sm);">
+                                        <div id="mainImagePreviewContainer" class="d-none" style="margin-top: 1rem;">
+                                            <img id="mainImagePreview" style="max-width: 200px; border-radius: var(--radius-sm);">
                                         </div>
+                                    </div>
+
+                                    <!-- Gallery Images Upload -->
+                                    <div class="form-group">
+                                        <label class="form-label">Gallery Images (Optional)</label>
+                                        <div class="multiple-file-upload" id="galleryUploadArea">
+                                            <input type="file" 
+                                                   name="gallery_images[]" 
+                                                   id="galleryImages" 
+                                                   accept="image/*" 
+                                                   multiple 
+                                                   onchange="previewGalleryImages(this)"
+                                                   style="position: absolute; opacity: 0; width: 100%; height: 100%; cursor: pointer;">
+                                            <div class="file-upload-icon">
+                                                <i class="fas fa-images"></i>
+                                            </div>
+                                            <div class="file-upload-text">
+                                                <strong>Click to upload gallery images</strong><br>
+                                                or drag and drop multiple images
+                                            </div>
+                                            <div class="upload-hint">
+                                                Select multiple images to showcase your dish from different angles
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Gallery Preview Grid -->
+                                        <div id="galleryPreviewGrid" class="image-preview-grid d-none"></div>
                                     </div>
                                 </div>
 
@@ -1298,8 +1451,6 @@ $dietary_tags_options = [
                                     </div>
                                 </div>
 
-                               
-
                                 <!-- Dietary Tags -->
                                 <div class="form-section">
                                     <h3 class="section-title">
@@ -1345,9 +1496,7 @@ $dietary_tags_options = [
                                                 </label>
                                             </div>
                                         </div>
-                                
                                     </div>
-
 
                                     <div class="form-group">
                                         <label for="meta_description" class="form-label">SEO Description</label>
@@ -1372,10 +1521,11 @@ $dietary_tags_options = [
                                     <div class="menu-preview-image" id="previewImage">
                                         <i class="fas fa-utensils"></i>
                                     </div>
+                                    <div class="preview-gallery" id="previewGallery" style="display: none;"></div>
                                     <div class="menu-preview-body">
                                         <div class="menu-preview-name" id="previewName">Menu Name</div>
                                         <div class="menu-preview-name-thai" id="previewNameThai"></div>
-                                        <div class="menu-preview-price" id="previewPrice">₿0.00</div>
+                                        <div class="menu-preview-price" id="previewPrice">$0.00</div>
                                         <div class="menu-preview-description" id="previewDescription"></div>
                                         <div class="menu-preview-nutrition" id="previewNutrition">
                                             <div class="nutrition-item">
@@ -1425,12 +1575,178 @@ $dietary_tags_options = [
     <div class="toast-container" id="toastContainer"></div>
 
     <script>
+        // Global variables for image handling
+        let galleryImages = [];
+        let mainImageFile = null;
+
         // Initialize page
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('Add Menu page initialized');
+            console.log('Add Menu page initialized with multiple image support');
             updatePreview();
             initializeCheckboxStyling();
+            initializeDragAndDrop();
         });
+
+        // Initialize drag and drop for gallery images
+        function initializeDragAndDrop() {
+            const galleryUploadArea = document.getElementById('galleryUploadArea');
+            
+            galleryUploadArea.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                this.style.background = 'rgba(207, 114, 58, 0.15)';
+            });
+            
+            galleryUploadArea.addEventListener('dragleave', function(e) {
+                e.preventDefault();
+                this.style.background = 'rgba(207, 114, 58, 0.05)';
+            });
+            
+            galleryUploadArea.addEventListener('drop', function(e) {
+                e.preventDefault();
+                this.style.background = 'rgba(207, 114, 58, 0.05)';
+                
+                const files = e.dataTransfer.files;
+                handleGalleryFiles(files);
+            });
+        }
+
+        // Handle gallery files (from drop or input)
+        function handleGalleryFiles(files) {
+            const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+            const maxSize = 5 * 1024 * 1024; // 5MB
+            
+            Array.from(files).forEach(file => {
+                if (!validTypes.includes(file.type)) {
+                    showToast(`${file.name} is not a valid image type`, 'error');
+                    return;
+                }
+                
+                if (file.size > maxSize) {
+                    showToast(`${file.name} is too large (max 5MB)`, 'error');
+                    return;
+                }
+                
+                // Add to gallery images array
+                galleryImages.push(file);
+                addImageToGalleryPreview(file, galleryImages.length - 1);
+            });
+            
+            updateGalleryPreview();
+            updatePreview();
+        }
+
+        // Preview main image
+        function previewMainImage(input) {
+            if (input.files && input.files[0]) {
+                mainImageFile = input.files[0];
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const previewContainer = document.getElementById('mainImagePreviewContainer');
+                    const previewImg = document.getElementById('mainImagePreview');
+                    const previewImageDiv = document.getElementById('previewImage');
+                    
+                    previewImg.src = e.target.result;
+                    previewContainer.classList.remove('d-none');
+                    
+                    // Update preview panel
+                    previewImageDiv.innerHTML = `<img src="${e.target.result}" style="width: 100%; height: 100%; object-fit: cover;">`;
+                };
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        // Preview gallery images
+        function previewGalleryImages(input) {
+            if (input.files && input.files.length > 0) {
+                handleGalleryFiles(input.files);
+            }
+        }
+
+        // Add image to gallery preview
+        function addImageToGalleryPreview(file, index) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const galleryGrid = document.getElementById('galleryPreviewGrid');
+                galleryGrid.classList.remove('d-none');
+                
+                const imageContainer = document.createElement('div');
+                imageContainer.className = 'preview-image-container';
+                imageContainer.dataset.index = index;
+                
+                imageContainer.innerHTML = `
+                    <img src="${e.target.result}" alt="Gallery Image ${index + 1}" class="preview-image">
+                    <button type="button" class="remove-image-btn" onclick="removeGalleryImage(${index})">
+                        <i class="fas fa-times"></i>
+                    </button>
+                `;
+                
+                galleryGrid.appendChild(imageContainer);
+                updateGalleryPreview();
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // Remove gallery image
+        function removeGalleryImage(index) {
+            galleryImages.splice(index, 1);
+            updateGalleryPreview();
+            updatePreview();
+            showToast('Image removed', 'info');
+        }
+
+        // Update gallery preview
+        function updateGalleryPreview() {
+            const galleryGrid = document.getElementById('galleryPreviewGrid');
+            const previewGallery = document.getElementById('previewGallery');
+            
+            if (galleryImages.length === 0) {
+                galleryGrid.classList.add('d-none');
+                previewGallery.style.display = 'none';
+                return;
+            }
+            
+            galleryGrid.classList.remove('d-none');
+            galleryGrid.innerHTML = '';
+            
+            // Update preview panel gallery
+            previewGallery.innerHTML = '';
+            previewGallery.style.display = 'grid';
+            
+            galleryImages.forEach((file, index) => {
+                // Add to main gallery grid
+                const imageContainer = document.createElement('div');
+                imageContainer.className = 'preview-image-container';
+                
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    imageContainer.innerHTML = `
+                        <img src="${e.target.result}" alt="Gallery Image ${index + 1}" class="preview-image">
+                        <button type="button" class="remove-image-btn" onclick="removeGalleryImage(${index})">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    `;
+                    
+                    // Add to preview gallery (first 4 images only)
+                    if (index < 4) {
+                        const previewImg = document.createElement('div');
+                        previewImg.className = 'preview-gallery-image';
+                        previewImg.innerHTML = `<img src="${e.target.result}" alt="Preview ${index + 1}">`;
+                        previewGallery.appendChild(previewImg);
+                    }
+                };
+                reader.readAsDataURL(file);
+                
+                galleryGrid.appendChild(imageContainer);
+            });
+            
+            // Show count if more than 4 images
+            if (galleryImages.length > 4) {
+                const countDiv = document.createElement('div');
+                countDiv.className = 'preview-gallery-image';
+                countDiv.innerHTML = `<div style="display: flex; align-items: center; justify-content: center; height: 100%; background: var(--cream); color: var(--text-dark); font-weight: 600;">+${galleryImages.length - 3}</div>`;
+                previewGallery.appendChild(countDiv);
+            }
+        }
 
         // Update preview in real-time
         function updatePreview() {
@@ -1446,7 +1762,7 @@ $dietary_tags_options = [
             document.getElementById('previewName').textContent = name;
             document.getElementById('previewNameThai').textContent = nameThai;
             document.getElementById('previewNameThai').style.display = nameThai ? 'block' : 'none';
-            document.getElementById('previewPrice').textContent = `₿${parseFloat(price).toFixed(2)}`;
+            document.getElementById('previewPrice').textContent = `$${parseFloat(price).toFixed(2)}`;
             document.getElementById('previewDescription').textContent = description;
             document.getElementById('previewDescription').style.display = description ? 'block' : 'none';
             
@@ -1455,27 +1771,6 @@ $dietary_tags_options = [
             document.getElementById('previewCarbs').textContent = carbs ? carbs + 'g' : '-';
             document.getElementById('previewFat').textContent = fat ? fat + 'g' : '-';
         }
-
-        // Preview uploaded image
-        function previewImage(input) {
-            if (input.files && input.files[0]) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    const previewContainer = document.getElementById('imagePreviewContainer');
-                    const previewImg = document.getElementById('imagePreview');
-                    const previewImageDiv = document.getElementById('previewImage');
-                    
-                    previewImg.src = e.target.result;
-                    previewContainer.classList.remove('d-none');
-                    
-                    // Update preview panel
-                    previewImageDiv.innerHTML = `<img src="${e.target.result}" style="width: 100%; height: 100%; object-fit: cover;">`;
-                };
-                reader.readAsDataURL(input.files[0]);
-            }
-        }
-
-
 
         // Initialize checkbox styling
         function initializeCheckboxStyling() {
@@ -1498,11 +1793,18 @@ $dietary_tags_options = [
 
         // Reset form
         function resetForm() {
-            if (confirm('Are you sure you want to reset the form? All entered data will be lost.')) {
+            if (confirm('Are you sure you want to reset the form? All entered data and uploaded images will be lost.')) {
                 document.getElementById('menuForm').reset();
-                document.getElementById('imagePreviewContainer').classList.add('d-none');
-                document.getElementById('previewImage').innerHTML = '<i class="fas fa-utensils"></i>';
                 
+                // Reset images
+                document.getElementById('mainImagePreviewContainer').classList.add('d-none');
+                document.getElementById('galleryPreviewGrid').classList.add('d-none');
+                document.getElementById('previewImage').innerHTML = '<i class="fas fa-utensils"></i>';
+                document.getElementById('previewGallery').style.display = 'none';
+                
+                // Clear image arrays
+                galleryImages = [];
+                mainImageFile = null;
                 
                 // Reset checkbox styling
                 document.querySelectorAll('.checkbox-item').forEach(item => {
@@ -1525,7 +1827,8 @@ $dietary_tags_options = [
                 preview.style.boxShadow = 'var(--shadow-soft)';
             }, 200);
             
-            showToast('This is how your menu will appear to customers', 'info');
+            const imageCount = (mainImageFile ? 1 : 0) + galleryImages.length;
+            showToast(`Preview updated! ${imageCount} image(s) ready for upload.`, 'info');
         }
 
         // Form submission handling
@@ -1554,14 +1857,16 @@ $dietary_tags_options = [
             // Show loading state
             submitBtn.disabled = true;
             submitBtn.classList.add('loading');
-            submitText.textContent = 'Creating Menu...';
+            
+            const imageCount = (mainImageFile ? 1 : 0) + galleryImages.length;
+            submitText.textContent = `Creating Menu with ${imageCount} image${imageCount !== 1 ? 's' : ''}...`;
             
             // Re-enable after timeout (in case of server errors)
             setTimeout(() => {
                 submitBtn.disabled = false;
                 submitBtn.classList.remove('loading');
                 submitText.textContent = 'Create Menu Item';
-            }, 10000);
+            }, 15000);
         });
 
         // Real-time validation
@@ -1581,76 +1886,6 @@ $dietary_tags_options = [
                 showToast('Please enter a valid price', 'error');
             } else {
                 this.classList.remove('error');
-            }
-        });
-
-        // Auto-save draft (localStorage)
-        function saveDraft() {
-            const formData = new FormData(document.getElementById('menuForm'));
-            const draftData = {};
-            
-            for (let [key, value] of formData.entries()) {
-                if (draftData[key]) {
-                    if (Array.isArray(draftData[key])) {
-                        draftData[key].push(value);
-                    } else {
-                        draftData[key] = [draftData[key], value];
-                    }
-                } else {
-                    draftData[key] = value;
-                }
-            }
-            
-            localStorage.setItem('menuDraft', JSON.stringify(draftData));
-        }
-
-        // Load draft
-        function loadDraft() {
-            const draft = localStorage.getItem('menuDraft');
-            if (draft && confirm('Would you like to restore your previously saved draft?')) {
-                try {
-                    const draftData = JSON.parse(draft);
-                    
-                    // Fill form fields
-                    Object.keys(draftData).forEach(key => {
-                        const element = document.querySelector(`[name="${key}"]`);
-                        if (element) {
-                            if (element.type === 'checkbox') {
-                                if (Array.isArray(draftData[key])) {
-                                    draftData[key].forEach(value => {
-                                        const checkbox = document.querySelector(`[name="${key}"][value="${value}"]`);
-                                        if (checkbox) checkbox.checked = true;
-                                    });
-                                } else {
-                                    element.checked = true;
-                                }
-                            } else {
-                                element.value = draftData[key];
-                            }
-                        }
-                    });
-                    
-                    updatePreview();
-                    initializeCheckboxStyling();
-                    showToast('Draft restored successfully', 'success');
-                } catch (e) {
-                    console.error('Error loading draft:', e);
-                }
-            }
-        }
-
-        // Auto-save every 30 seconds
-        setInterval(saveDraft, 30000);
-
-        // Save on form changes
-        document.getElementById('menuForm').addEventListener('change', saveDraft);
-
-        // Clear draft on successful submission
-        window.addEventListener('beforeunload', function() {
-            // Only save if form has content
-            const name = document.getElementById('name').value.trim();
-            if (name) {
-                saveDraft();
             }
         });
 
@@ -1710,8 +1945,7 @@ $dietary_tags_options = [
         document.addEventListener('keydown', function(e) {
             if (e.ctrlKey && e.key === 's') {
                 e.preventDefault();
-                saveDraft();
-                showToast('Draft saved', 'success');
+                showToast('Auto-save feature coming soon!', 'info');
             }
             if (e.ctrlKey && e.key === 'Enter') {
                 e.preventDefault();
@@ -1725,14 +1959,15 @@ $dietary_tags_options = [
             }
         });
 
-        // Form progress indicator
+        // Monitor form completion
         function updateFormProgress() {
             const requiredFields = document.querySelectorAll('input[required], textarea[required]');
             const filledFields = Array.from(requiredFields).filter(field => field.value.trim() !== '').length;
+            const imageCount = (mainImageFile ? 1 : 0) + galleryImages.length;
             const progress = Math.round((filledFields / requiredFields.length) * 100);
             
-            // Update page title with progress
-            document.title = `Add New Menu (${progress}% complete) - Krua Thai Admin`;
+            // Update page title with progress and image count
+            document.title = `Add New Menu (${progress}% complete, ${imageCount} images) - Somdul Table Admin`;
             
             return progress;
         }
@@ -1742,47 +1977,13 @@ $dietary_tags_options = [
             field.addEventListener('input', updateFormProgress);
         });
 
-        // Drag and drop for image upload
-        const fileUpload = document.querySelector('.file-upload');
-        
-        fileUpload.addEventListener('dragover', function(e) {
-            e.preventDefault();
-            this.style.borderColor = 'var(--curry)';
-            this.style.background = 'rgba(207, 114, 58, 0.1)';
-        });
-        
-        fileUpload.addEventListener('dragleave', function(e) {
-            e.preventDefault();
-            this.style.borderColor = 'var(--border-light)';
-            this.style.background = '#fafafa';
-        });
-        
-        fileUpload.addEventListener('drop', function(e) {
-            e.preventDefault();
-            this.style.borderColor = 'var(--border-light)';
-            this.style.background = '#fafafa';
-            
-            const files = e.dataTransfer.files;
-            if (files.length > 0) {
-                const fileInput = this.querySelector('input[type="file"]');
-                fileInput.files = files;
-                previewImage(fileInput);
-            }
-        });
-
-        // Load draft on page load
-        window.addEventListener('load', function() {
-            setTimeout(loadDraft, 500);
-        });
-
         // Performance monitoring
         window.addEventListener('load', function() {
             const loadTime = performance.now();
             console.log(`Add Menu page loaded in ${Math.round(loadTime)}ms`);
         });
 
-        console.log('Krua Thai Add Menu initialized successfully');
+        console.log('Somdul Table Add Menu with Multiple Images initialized successfully');
     </script>
 </body>
 </html>
-    
