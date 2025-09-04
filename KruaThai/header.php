@@ -1,6 +1,6 @@
 <?php
 /**
- * Somdul Table - Updated Header Component with Notifications
+ * Somdul Table - Updated Header Component with Dynamic Promotional Banner
  * File: header.php
  * Include this file in every page that needs the navigation and promo banner
  */
@@ -9,6 +9,42 @@
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
+
+// Load promotional banner settings from database
+$promoSettings = [];
+try {
+    if (isset($pdo)) {
+        $stmt = $pdo->prepare("SELECT setting_key, setting_value, setting_type FROM system_settings WHERE category = 'promotion' AND is_public = 1");
+        $stmt->execute();
+        $settings = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        foreach ($settings as $setting) {
+            $value = $setting['setting_value'];
+            
+            // Convert boolean strings to actual booleans
+            if ($setting['setting_type'] === 'boolean') {
+                $value = filter_var($value, FILTER_VALIDATE_BOOLEAN);
+            }
+            
+            $promoSettings[$setting['setting_key']] = $value;
+        }
+    }
+} catch (Exception $e) {
+    error_log("Error loading promotional settings: " . $e->getMessage());
+}
+
+// Set default values if database settings are not available
+$promoDefaults = [
+    'promo_banner_enabled' => true,
+    'promo_banner_desktop_text' => '50% OFF First Week + Free Cookies for Life',
+    'promo_banner_mobile_text' => '50% OFF + Free Cookies',
+    'promo_banner_left_icon' => '🪴',
+    'promo_banner_right_icon' => '🎉',
+    'promo_banner_background_color' => '#cf723a'
+];
+
+// Merge with defaults
+$promoSettings = array_merge($promoDefaults, $promoSettings);
 
 // Initialize notification data if user is logged in
 $notificationData = null;
@@ -113,6 +149,9 @@ if (isset($_SESSION['user_id'])) {
     
     /* Transitions */
     --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    
+    /* Dynamic promotional banner background */
+    --promo-bg: <?php echo htmlspecialchars($promoSettings['promo_banner_background_color']); ?>;
 }
 
 /* Global reset */
@@ -685,13 +724,13 @@ h1, h2, h3, h4, h5, h6 {
     color: var(--brown);
 }
 
-/* Promotional Banner Styles */
+/* Promotional Banner Styles - Updated for Dynamic Content */
 .promo-banner {
     position: fixed;
     top: 0;
     left: 0;
     right: 0;
-    background: #cf723a;
+    background: var(--promo-bg);
     color: var(--white);
     text-align: center;
     padding: 8px 20px;
@@ -702,6 +741,32 @@ h1, h2, h3, h4, h5, h6 {
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
     animation: glow 2s ease-in-out infinite alternate;
 }
+
+<?php if (!$promoSettings['promo_banner_enabled']): ?>
+.promo-banner {
+    display: none;
+}
+
+.navbar {
+    top: 0;
+}
+
+body.has-header {
+    margin-top: 72px;
+}
+
+@media (max-width: 768px) {
+    body.has-header {
+        margin-top: 67px;
+    }
+}
+
+@media (max-width: 480px) {
+    body.has-header {
+        margin-top: 62px;
+    }
+}
+<?php endif; ?>
 
 .promo-banner-content {
     max-width: 1200px;
@@ -782,6 +847,12 @@ h1, h2, h3, h4, h5, h6 {
     .navbar {
         top: 28px;
     }
+    
+    <?php if (!$promoSettings['promo_banner_enabled']): ?>
+    .navbar {
+        top: 0;
+    }
+    <?php endif; ?>
     
     .promo-banner-content {
         flex-direction: row;
@@ -902,6 +973,12 @@ h1, h2, h3, h4, h5, h6 {
     .navbar {
         top: 24px;
     }
+    
+    <?php if (!$promoSettings['promo_banner_enabled']): ?>
+    .navbar {
+        top: 0;
+    }
+    <?php endif; ?>
 }
 
 /* Body margin adjustment for pages using this header */
@@ -922,18 +999,20 @@ body.has-header {
 }
 </style>
 
-<!-- Promotional Banner -->
+<?php if ($promoSettings['promo_banner_enabled']): ?>
+<!-- Dynamic Promotional Banner -->
 <div class="promo-banner" id="promoBanner">
     <div class="promo-banner-content">
-        <span class="promo-icon">🪴</span>
+        <span class="promo-icon"><?php echo htmlspecialchars($promoSettings['promo_banner_left_icon']); ?></span>
         <span class="promo-text">
-            <span class="desktop-text">50% OFF First Week + Free Cookies for Life</span>
-            <span class="mobile-text">50% OFF + Free Cookies</span>
+            <span class="desktop-text"><?php echo htmlspecialchars($promoSettings['promo_banner_desktop_text']); ?></span>
+            <span class="mobile-text"><?php echo htmlspecialchars($promoSettings['promo_banner_mobile_text']); ?></span>
         </span>
-        <span class="promo-icon">🎉</span>
+        <span class="promo-icon"><?php echo htmlspecialchars($promoSettings['promo_banner_right_icon']); ?></span>
     </div>
     <button class="promo-close" onclick="closePromoBanner()" title="Close">×</button>
 </div>
+<?php endif; ?>
 
 <!-- Navigation -->
 <nav class="navbar">
@@ -1448,9 +1527,29 @@ function closePromoBanner() {
         setTimeout(() => {
             promoBanner.style.display = 'none';
             navbar.style.top = '0';
+            
+            // Adjust body margin when banner is hidden
+            document.body.style.marginTop = '72px';
+            
+            // Store banner closed state
+            localStorage.setItem('promoBannerClosed', 'true');
         }, 300);
     }
 }
+
+// Check if banner was previously closed
+document.addEventListener('DOMContentLoaded', function() {
+    if (localStorage.getItem('promoBannerClosed') === 'true') {
+        const promoBanner = document.getElementById('promoBanner');
+        const navbar = document.querySelector('.navbar');
+        
+        if (promoBanner && navbar) {
+            promoBanner.style.display = 'none';
+            navbar.style.top = '0';
+            document.body.style.marginTop = '72px';
+        }
+    }
+});
 
 // Navbar background on scroll
 window.addEventListener('scroll', function() {

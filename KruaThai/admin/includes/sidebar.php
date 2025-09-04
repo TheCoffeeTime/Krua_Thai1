@@ -36,7 +36,7 @@ $current_page = basename($_SERVER['PHP_SELF'], '.php');
                 <span class="nav-badge"><?= $pending_orders_count ?></span>
                 <?php endif; ?>
             </a>
-            <a href="workinprogress.php" class="nav-item <?= $current_page === 'orders' ? 'active' : '' ?>">
+            <a href="meal-kits.php" class="nav-item <?= $current_page === 'orders' ? 'active' : '' ?>">
                 <i class="nav-icon fas fa-box"></i>
                 <span>Meal Kits</span>
             </a>
@@ -101,7 +101,7 @@ $current_page = basename($_SERVER['PHP_SELF'], '.php');
         
         <div class="nav-section">
             <div class="nav-section-title">Content</div>
-            <a href="workinprogress.php" class="nav-item <?= $current_page === 'promotions' ? 'active' : '' ?>">
+            <a href="promotional-settings.php" class="nav-item <?= $current_page === 'promotions' ? 'active' : '' ?>">
                 <i class="nav-icon fas fa-percent"></i>
                 <span>Promotions</span>
             </a>

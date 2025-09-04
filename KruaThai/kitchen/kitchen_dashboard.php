@@ -1382,20 +1382,10 @@ if ($export_type === 'json') {
             </div>
             <div class="header-meta">
                 <div class="meta-item">
-                    <i class="fas fa-calendar-day"></i>
-                    <span><?php echo !empty($selected_date) ? date('l, M j, Y', strtotime($selected_date)) : 'Date not selected'; ?></span>
-                </div>
-                <div class="meta-item">
-                    <i class="fas fa-users"></i>
-                    <span><?php echo $total_customers; ?> Customers</span>
-                </div>
-                <div class="meta-item">
-                    <i class="fas fa-bowl-food"></i>
-                    <span><?php echo $total_meals; ?> Meals</span>
-                </div>
-                <div class="meta-item">
+                    <a href="manage_order.php" class="btn-back">
                     <i class="fas fa-user-circle"></i>
-                    <span><?php echo htmlspecialchars($_SESSION['first_name'] ?? 'Kitchen Staff'); ?></span>
+                    <span>Mark accept orders</span>
+                    </a>
                 </div>
                 <div class="meta-item">
                     <a href="../admin/dashboard.php" class="btn-back">
