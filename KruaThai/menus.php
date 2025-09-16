@@ -4,6 +4,7 @@
  * File: menus.php
  * Description: Browse, filter, and search all available menus
  * UPDATED: Removed modal, links to menu-details.php page
+ * FIXED: Consistent menu card heights and layout
  */
 
 error_reporting(E_ALL);
@@ -307,6 +308,7 @@ try {
         margin-bottom: 3rem;
     }
 
+    /* FIXED: Consistent Menu Cards */
     .menu-card {
         background: var(--white);
         border-radius: 16px;
@@ -315,6 +317,9 @@ try {
         border: 1px solid var(--border-light);
         transition: var(--transition);
         position: relative;
+        height: 650px; /* Fixed height for consistency */
+        display: flex;
+        flex-direction: column;
     }
 
     .menu-card:hover {
@@ -335,6 +340,7 @@ try {
         font-family: 'BaticaSans', sans-serif;
         cursor: pointer;
         transition: var(--transition);
+        flex-shrink: 0; /* Prevent shrinking */
     }
 
     .menu-image:hover { transform: scale(1.02); }
@@ -367,7 +373,13 @@ try {
         font-family: 'BaticaSans', sans-serif;
     }
 
-    .menu-content { padding: 1.5rem; }
+    /* FIXED: Flexible content area */
+    .menu-content { 
+        padding: 1.5rem; 
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+    }
 
     .menu-category {
         font-size: 0.8rem;
@@ -379,6 +391,7 @@ try {
         font-family: 'BaticaSans', sans-serif;
     }
 
+    /* FIXED: Consistent title height (exactly 2 lines) */
     .menu-title {
         font-size: 1.3rem;
         font-weight: 700;
@@ -386,21 +399,22 @@ try {
         margin-bottom: 0.8rem;
         line-height: 1.3;
         font-family: 'BaticaSans', sans-serif;
+        height: 3.38rem; /* Fixed height for exactly 2 lines (1.3rem * 1.3 * 2) */
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
     }
 
-    .menu-title-en {
-        font-size: 0.9rem;
-        color: var(--text-gray);
-        font-weight: 500;
-        margin-bottom: 0.8rem;
-        font-family: 'BaticaSans', sans-serif;
-    }
 
+    /* FIXED: Consistent description height (exactly 3 lines with ellipsis) */
     .menu-description {
         color: var(--text-gray);
         font-size: 0.95rem;
         line-height: 1.5;
         margin-bottom: 1.2rem;
+        height: 4.275rem; /* Fixed height for exactly 3 lines (0.95rem * 1.5 * 3) */
         display: -webkit-box;
         -webkit-line-clamp: 3;
         line-clamp: 3;
@@ -469,12 +483,14 @@ try {
         font-family: 'BaticaSans', sans-serif;
     }
 
+    /* FIXED: Footer pushed to bottom */
     .menu-footer {
         display: flex;
         justify-content: space-between;
         align-items: center;
         padding-top: 1rem;
         border-top: 1px solid var(--border-light);
+        margin-top: auto; /* This pushes the footer to the bottom */
     }
 
     .menu-price {
@@ -568,6 +584,11 @@ try {
         .container { padding: 0 15px; }
         .menus-grid { grid-template-columns: 1fr; }
         .results-header { flex-direction: column; gap: 1rem; align-items: flex-start; }
+        
+        /* FIXED: Shorter height on mobile for single column */
+        .menu-card {
+            height: 520px; /* Slightly shorter on mobile */
+        }
         
         .menu-nav-wrapper {
             padding: 0 50px; /* Slightly less padding on mobile */
@@ -751,11 +772,6 @@ try {
                                     <?php echo htmlspecialchars($menu['name'] ?: $menu['name_thai']); ?>
                                 </h3>
                                 
-                                <?php if ($menu['name_thai'] && $menu['name']): ?>
-                                    <div class="menu-title-en">
-                                        <?php echo htmlspecialchars($menu['name_thai']); ?>
-                                    </div>
-                                <?php endif; ?>
                                 
                                 <p class="menu-description">
                                     <?php echo htmlspecialchars($menu['description'] ?: 'Healthy Thai cuisine'); ?>

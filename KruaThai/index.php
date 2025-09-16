@@ -661,6 +661,14 @@ $default_icon = '<path d="M12 2c-1.1 0-2 .9-2 2v2H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2
         font-family: 'BaticaSans', sans-serif;
         font-weight: 500; /* Slightly bolder for better readability */
         font-size: 0.9rem; /* Smaller text size */
+        
+        /* Limit to exactly 3 lines */
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        height: calc(1.4em * 3); /* Fixed height for exactly 3 lines */
     }
 
     /* Responsive adjustments */
@@ -2323,6 +2331,31 @@ $default_icon = '<path d="M12 2c-1.1 0-2 .9-2 2v2H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2
     .rounded-lg { border-radius: 0.5rem; }
     .rounded-pill { border-radius: 50px; }
     .rounded-circle { border-radius: 50%; }
+
+/* Custom scrollbar for popup container */
+.popup-container::-webkit-scrollbar {
+    width: 6px;
+}
+
+.popup-container::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 10px;
+    margin: 10px 0; /* This creates space from top/bottom rounded corners */
+}
+
+.popup-container::-webkit-scrollbar-thumb {
+    background: rgba(189, 147, 121, 0.6);
+    border-radius: 10px;
+    border: none;
+}
+
+.popup-container::-webkit-scrollbar-thumb:hover {
+    background: var(--brown);
+}
+
+.popup-container::-webkit-scrollbar-corner {
+    background: transparent;
+}
     </style>
 </head>
 

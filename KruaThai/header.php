@@ -252,7 +252,7 @@ h1, h2, h3, h4, h5, h6 {
     left: 50%;
 }
 
-/* Mobile Navigation Menu */
+/* Mobile Navigation Menu - Default Mobile Behavior */
 .mobile-nav-menu {
     display: none;
     position: fixed;
@@ -269,6 +269,68 @@ h1, h2, h3, h4, h5, h6 {
 .mobile-nav-menu.active {
     transform: translateX(0);
     display: block; /* Ensure it's visible when active */
+}
+
+/* DESKTOP DROPDOWN BEHAVIOR - NEW */
+@media (min-width: 769px) {
+    .mobile-nav-menu {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        width: 280px;
+        height: auto;
+        max-height: 400px;
+        background: var(--white);
+        border-radius: 0;
+        box-shadow: var(--shadow-medium);
+        border: 2px solid var(--cream);
+        transform: translateY(-10px);
+        opacity: 0;
+        visibility: hidden;
+        transition: all 0.3s ease;
+        overflow: hidden;
+    }
+
+    .mobile-nav-menu.active {
+        transform: translateY(0);
+        opacity: 1;
+        visibility: visible;
+        display: block;
+    }
+
+    /* Desktop dropdown positioning relative to navbar */
+    .navbar {
+        position: relative;
+    }
+
+    /* Hide mobile menu header for desktop dropdown */
+    .mobile-menu-header {
+        display: none;
+    }
+
+    /* Adjust navigation links for desktop dropdown */
+    .mobile-nav-links {
+        padding: 1rem;
+        max-height: 300px;
+        overflow-y: auto;
+    }
+
+    .mobile-nav-links li {
+        margin-bottom: 0.5rem;
+    }
+
+    .mobile-nav-links a {
+        padding: 0.8rem 1rem;
+        font-size: 1rem;
+        border-radius: var(--radius-md);
+        border-bottom: none;
+        transition: all 0.3s ease;
+    }
+
+    .mobile-nav-links a:hover {
+        background: var(--cream);
+        color: var(--brown);
+    }
 }
 
 /* Mobile Menu Header with Close Button */
@@ -421,6 +483,7 @@ h1, h2, h3, h4, h5, h6 {
     font-weight: 500;
     font-family: 'BaticaSans', sans-serif;
     transition: var(--transition);
+    font-size: 1.1rem; 
 }
 
 .nav-links a:hover {
@@ -948,6 +1011,72 @@ body.has-header {
     .notification-details p {
         font-size: 0.75rem;
     }
+
+    /* Reset mobile nav menu for mobile screens - Half screen width */
+    .mobile-nav-menu {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 50%;
+        height: 100vh;
+        background: var(--white);
+        z-index: 1100;
+        transform: translateX(-100%);
+        opacity: 1;
+        visibility: visible;
+        transition: transform 0.3s ease;
+    }
+
+    .mobile-nav-menu.active {
+        transform: translateX(0);
+        display: block;
+    }
+
+    /* Reset mobile menu header for mobile */
+    .mobile-menu-header {
+        background: var(--cream);
+        color: var(--brown);
+        padding: 1rem 2rem;
+        border-bottom: 2px solid var(--cream);
+    }
+
+    .mobile-menu-title {
+        color: var(--brown);
+        font-size: 1.2rem;
+    }
+
+    .mobile-close-btn {
+        color: var(--brown);
+        width: 50px;
+        height: 50px;
+        font-size: 2rem;
+    }
+
+    .mobile-close-btn:hover {
+        background: rgba(189, 147, 121, 0.1);
+    }
+
+    /* Reset navigation links for mobile - More compact */
+    .mobile-nav-links {
+        padding: 1.5rem;
+    }
+
+    .mobile-nav-links li {
+        margin-bottom: 0.8rem;
+    }
+
+    .mobile-nav-links a {
+        padding: 0.6rem 0;
+        font-size: 1rem;
+        border-radius: 0;
+        border-bottom: 1px solid var(--cream);
+        background: transparent;
+    }
+
+    .mobile-nav-links a:hover {
+        background: transparent;
+        color: var(--brown);
+    }
 }
 
 @media (max-width: 480px) {
@@ -1016,8 +1145,7 @@ body.has-header {
 
 <!-- Navigation -->
 <nav class="navbar">
-    <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 2rem; max-width: 1200px; margin: 0 auto; width: 100%;">
-        <!-- Mobile hamburger menu -->
+<div style="display: flex; justify-content: space-between; align-items: center; padding: 0.6rem 2rem; max-width: 1200px; margin: 0 auto; width: 100%; position: relative;">        <!-- Mobile hamburger menu -->
         <button class="mobile-menu-toggle" id="mobileMenuToggle" onclick="toggleMobileMenu()" type="button" aria-label="Toggle mobile menu">
             <div class="hamburger" id="hamburger">
                 <span></span>
@@ -1028,7 +1156,7 @@ body.has-header {
         </button>
 
         <a href="index.php" class="logo">
-            <img src="./assets/image/LOGO_BG2.png" alt="Somdul Table" style="height: 80px; width: auto;">
+            <img src="./assets/image/logowide.png" alt="Somdul Table" style="height: 80px; width: auto;">
         </a>
 
         <ul class="nav-links">
@@ -1132,32 +1260,32 @@ body.has-header {
             <?php endif; ?>
             <a href="subscribe.php" class="btn btn-primary">Get Started</a>
         </div>
+
+        <!-- Mobile Navigation Menu - Desktop Dropdown / Mobile Fullscreen -->
+        <div class="mobile-nav-menu" id="mobileNavMenu">
+            <!-- Mobile Menu Header with Close Button -->
+            <div class="mobile-menu-header">
+                <div class="mobile-menu-logo">
+                    <img src="./assets/image/LOGO_BG2.png" alt="Somdul Table">
+                    <span class="mobile-menu-title">Somdul Table</span>
+                </div>
+                <button class="mobile-close-btn" onclick="closeMobileMenu()" type="button" aria-label="Close menu">
+                    ×
+                </button>
+            </div>
+            
+            <!-- Mobile Navigation Links -->
+            <ul class="mobile-nav-links">
+                <li><a href="./index.php" onclick="closeMobileMenu()">🏠 Home</a></li>
+                <li><a href="./menus.php" onclick="closeMobileMenu()">🍽️ Menu</a></li>
+                <li><a href="./product.php" onclick="closeMobileMenu()">📦 Meal-Kits</a></li>
+                <li><a href="./index.php#how-it-works" onclick="closeMobileMenu()">❓ How It Works</a></li>
+                <li><a href="./blogs.php" onclick="closeMobileMenu()">📚 About</a></li>
+                <li><a href="./contact.php" onclick="closeMobileMenu()">📞 Contact</a></li>
+            </ul>
+        </div>
     </div>
 </nav>
-
-<!-- Mobile Navigation Menu -->
-<div class="mobile-nav-menu" id="mobileNavMenu">
-    <!-- Mobile Menu Header with Close Button -->
-    <div class="mobile-menu-header">
-        <div class="mobile-menu-logo">
-            <img src="./assets/image/LOGO_BG2.png" alt="Somdul Table">
-            <span class="mobile-menu-title">Somdul Table</span>
-        </div>
-        <button class="mobile-close-btn" onclick="closeMobileMenu()" type="button" aria-label="Close menu">
-            ×
-        </button>
-    </div>
-    
-    <!-- Mobile Navigation Links -->
-    <ul class="mobile-nav-links">
-        <li><a href="./index.php" onclick="closeMobileMenu()">🏠 Home</a></li>
-        <li><a href="./menus.php" onclick="closeMobileMenu()">🍽️ Menu</a></li>
-        <li><a href="./product.php" onclick="closeMobileMenu()">📦 Meal-Kits</a></li>
-        <li><a href="./index.php#how-it-works" onclick="closeMobileMenu()">❓ How It Works</a></li>
-        <li><a href="./blogs.php" onclick="closeMobileMenu()">📚 About</a></li>
-        <li><a href="./contact.php" onclick="closeMobileMenu()">📞 Contact</a></li>
-    </ul>
-</div>
 
 <script>
 // Header JavaScript Functions
@@ -1182,11 +1310,13 @@ function toggleMobileMenu() {
         hamburger.classList.toggle('open');
         window.mobileMenuOpen = !window.mobileMenuOpen;
         
-        // Handle body scroll
-        if (mobileMenu.classList.contains('active')) {
-            body.style.overflow = 'hidden';
-        } else {
-            body.style.overflow = 'auto';
+        // Handle body scroll - only prevent scrolling on mobile
+        if (window.innerWidth <= 768) {
+            if (mobileMenu.classList.contains('active')) {
+                body.style.overflow = 'hidden';
+            } else {
+                body.style.overflow = 'auto';
+            }
         }
         
     } catch (error) {
