@@ -551,13 +551,24 @@ function formatPrice($price) {
             border-radius: var(--radius-md);
             box-shadow: var(--shadow-medium);
             z-index: 1000;
-            transform: translateX(400px);
-            transition: transform 0.3s ease-out;
             max-width: 350px;
+            display: none; /* Hidden by default */
         }
-        
+
         .toast-notification.show {
-            transform: translateX(0);
+            display: block;
+            animation: slideInFromRight 0.3s ease-out;
+        }
+
+        @keyframes slideInFromRight {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
         }
         
         .toast-content {

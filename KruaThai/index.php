@@ -130,15 +130,35 @@ try {
 
 // Category icons mapping
 $category_icons = [
-    'Rice Bowls' => '<path d="M12 2c-1.1 0-2 .9-2 2v2H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-2V4c0-1.1-.9-2-2-2zm0 2v2h-2V4h2zm-4 4h8v2h-8V8zm0 4h8v6H8v-6z"/>',
-    'Thai Curries' => '<path d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4zM6 18.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm13.5-9l1.96 2.5H17V9.5h2.5zm-1.5 9c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/>',
-    'Noodle Dishes' => '<path d="M22 2v20H2V2h20zm-2 2H4v16h16V4zM6 8h12v2H6V8zm0 4h12v2H6v-2zm0 4h8v2H6v-2z"/>',
-    'Stir Fry' => '<path d="M12.5 3.5c0 .83-.67 1.5-1.5 1.5s-1.5-.67-1.5-1.5S10.17 2 11 2s1.5.67 1.5 1.5zM20 8H4c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2v-8c0-1.1-.9-2-2-2zm0 10H4v-8h16v8zm-8-6c1.38 0 2.5 1.12 2.5 2.5S13.38 17 12 17s-2.5-1.12-2.5-2.5S10.62 12 12 12z"/>',
-    'Rice Dishes' => '<path d="M18 3H6c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H6V5h12v14zM8 7h8v2H8V7zm0 4h8v2H8v-2zm0 4h6v2H8v-2z"/>',
-    'Soups' => '<path d="M4 18h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2zm0-10h16v8H4V8zm8-4c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2z"/>',
-    'Salads' => '<path d="M7 10c0-1.1.9-2 2-2s2 .9 2 2-.9 2-2 2-2-.9-2-2zm8 0c0-1.1.9-2 2-2s2 .9 2 2-.9 2-2 2-2-.9-2-2zM12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8 0-1.12.23-2.18.65-3.15C6.53 8.51 8 8 9.64 8c.93 0 1.83.22 2.64.61.81-.39 1.71-.61 2.64-.61 1.64 0 3.11.51 4.35.85.42.97.65 2.03.65 3.15 0 4.41-3.59 8-8 8z"/>',
-    'Desserts' => '<path d="M12 3L8 6.5h8L12 3zm0 18c4.97 0 9-4.03 9-9H3c0 4.97 4.03 9 9 9zm0-16L8.5 8h7L12 5z"/>',
-    'Beverages' => '<path d="M5 4v3h5.5v12h3V7H19V4H5z"/>'
+    // Rice bowl with steam and chopsticks
+    'Rice Bowls' => '<path d="M12 2c-3.31 0-6 2.69-6 6v1c0 2.21 1.79 4 4 4h4c2.21 0 4-1.79 4-4V8c0-3.31-2.69-6-6-6zm-4 7V8c0-2.21 1.79-4 4-4s4 1.79 4 4v1c0 1.1-.9 2-2 2h-4c-1.1 0-2-.9-2-2z"/><path d="M3 15h2l2 7h10l2-7h2v2l-2 6H5l-2-6v-2z"/><circle cx="10" cy="6" r="0.5"/><circle cx="14" cy="6" r="0.5"/><circle cx="12" cy="7" r="0.5"/>',
+    
+    // Curry pot with steam swirls
+    'Thai Curries & Soups' => '<path d="M7 12c-1.1 0-2 .9-2 2v6c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2v-6c0-1.1-.9-2-2-2H7zm0 2h10v6H7v-6z"/><path d="M9 8c0-1.1.9-2 2-2h2c1.1 0 2 .9 2 2v2h-6V8z"/><path d="M8 4c.5-.5 1-.5 1.5 0s.5 1 0 1.5-.5.5-1 .5S8 5.5 8 4zm4-2c.5-.5 1-.5 1.5 0s.5 1 0 1.5-.5.5-1 .5S12 2.5 12 2zm4 2c.5-.5 1-.5 1.5 0s.5 1 0 1.5-.5.5-1 .5S16 4.5 16 4z"/><circle cx="12" cy="16" r="1"/>',
+    
+    // Glass with ice cubes and straw
+    'Beverages' => '<path d="M8 2v2h8V2H8zm0 4v14c0 1.1.9 2 2 2h4c1.1 0 2-.9 2-2V6H8zm6 12h-4v-2h4v2zm0-4h-4v-2h4v2zm0-4h-4V8h4v2z"/><path d="M17 4h2v16h-2V4z"/><rect x="9" y="8" width="1" height="1"/><rect x="11" y="9" width="1" height="1"/><rect x="13" y="8" width="1" height="1"/>',
+    
+    // Sandwich/wrap with layers
+    'Sandwiches' => '<path d="M2 8c0-1.1.9-2 2-2h16c1.1 0 2 .9 2 2v1H2V8z"/><path d="M2 10h20v1c0 .55-.45 1-1 1H3c-.55 0-1-.45-1-1v-1z"/><path d="M3 13h18c.55 0 1 .45 1 1v1H2v-1c0-.55.45-1 1-1z"/><path d="M2 16h20v1c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2v-1z"/><circle cx="6" cy="9.5" r="0.5" fill="#cf723a"/><circle cx="9" cy="9.5" r="0.5" fill="#28a745"/><circle cx="12" cy="9.5" r="0.5" fill="#dc3545"/><circle cx="15" cy="13.5" r="0.5" fill="#cf723a"/><circle cx="18" cy="13.5" r="0.5" fill="#28a745"/>',
+    
+    // Wok with ingredients flying up
+    'Stir Fry Dishes' => '<path d="M4 14c0-4.41 3.59-8 8-8s8 3.59 8 8c0 2.21-.9 4.21-2.35 5.65L12 15l-5.65 4.65C4.9 18.21 4 16.21 4 14z"/><path d="M12 8c-3.31 0-6 2.69-6 6 0 1.66.67 3.16 1.76 4.24l.71-.71C7.61 16.67 7.19 15.38 7.19 14c0-2.65 2.15-4.81 4.81-4.81s4.81 2.15 4.81 4.81c0 1.38-.43 2.67-1.28 3.53l.71.71C17.33 17.16 18 15.66 18 14c0-3.31-2.69-6-6-6z"/><circle cx="8" cy="4" r="1" fill="#28a745"/><circle cx="12" cy="2" r="1" fill="#dc3545"/><circle cx="16" cy="4" r="1" fill="#ffc107"/><circle cx="20" cy="6" r="1" fill="#28a745"/>',
+    
+    // Grill grate with flames
+    'Grilled & BBQ' => '<path d="M2 14h20v2H2v-2zm0 4h20v2H2v-2zm0-8h20v2H2v-2z"/><path d="M4 18l2-4 2 4 2-4 2 4 2-4 2 4 2-4 2 4 2-4v6H4v-6z" fill="#cf723a" opacity="0.6"/><path d="M6 8c0-1 1-2 1-2s1 1 1 2-1 1-1 1-1 0-1-1zm4-2c0-1 1-2 1-2s1 1 1 2-1 1-1 1-1 0-1-1zm4 0c0-1 1-2 1-2s1 1 1 2-1 1-1 1-1 0-1-1zm4 2c0-1 1-2 1-2s1 1 1 2-1 1-1 1-1 0-1-1z" fill="#dc3545"/>',
+    
+    // Leafy salad bowl with vegetables
+    'Salads' => '<path d="M12 2c-1.1 0-2 .9-2 2 0 .74.4 1.38 1 1.73V7c-3.31 0-6 2.69-6 6v5c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2v-5c0-3.31-2.69-6-6-6V5.73c.6-.35 1-.99 1-1.73 0-1.1-.9-2-2-2z"/><path d="M7 13c0-2.76 2.24-5 5-5s5 2.24 5 5v5H7v-5z"/><circle cx="9" cy="15" r="1" fill="#28a745"/><circle cx="15" cy="14" r="1" fill="#dc3545"/><circle cx="11" cy="16" r="0.5" fill="#ffc107"/><circle cx="13" cy="17" r="0.5" fill="#28a745"/>',
+    
+    // Fish with scales and fins
+    'Seafood Specialties' => '<path d="M12 4c-4 0-8 3-8 7s4 7 8 7c2.5 0 4.8-1.2 6.4-3.2L22 12l-3.6-2.8C16.8 7.2 14.5 6 12 4zm0 2c2 0 3.8.8 5.1 2.2L19.2 12l-2.1 1.8C15.8 15.2 14 16 12 16c-3.1 0-6-2.2-6-5s2.9-5 6-5z"/><circle cx="15" cy="10" r="1.5"/><path d="M2 12l3-1v2l-3-1z"/><path d="M12 8c0-1 .5-2 .5-2S14 7 14 8s-1 1-1 1-.5-.5-.5-1z"/><path d="M12 16c0 1-.5 2-.5 2S10 17 10 16s1-1 1-1 .5.5.5 1z"/>',
+    
+    // Layered cake with cherry on top
+    'Desserts' => '<path d="M12 2l-2 2h4l-2-2zm0 20c4.97 0 9-4.03 9-9H3c0 4.97 4.03 9 9 9z"/><path d="M5 11h14v2H5v-2z"/><path d="M6 14h12v2H6v-2z"/><path d="M7 17h10v1H7v-1z"/><circle cx="12" cy="5" r="1" fill="#dc3545"/><path d="M12 5c0 .5-.2 1-.5 1.3L11 7h2l-.5-.7C12.2 6 12 5.5 12 5z" fill="#28a745"/>',
+    
+    // Noodles with chopsticks
+    'Noodle Dishes' => '<path d="M5 12c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2v6c0 1.1-.9 2-2 2H7c-1.1 0-2-.9-2-2v-6z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M7 14h10" stroke="currentColor" stroke-width="1.5"/><path d="M7 16h10" stroke="currentColor" stroke-width="1.5"/><path d="M7 18h10" stroke="currentColor" stroke-width="1.5"/><line x1="2" y1="4" x2="8" y2="10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="22" y1="4" x2="16" y2="10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
 ];
 
 // Default icon for categories not in mapping
@@ -909,23 +929,29 @@ $default_icon = '<path d="M12 2c-1.1 0-2 .9-2 2v2H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2
         font-size: 1rem;
         font-style: italic;
         position: relative;
+        padding-left: 1rem;
+        padding-right: 0.5rem;
     }
 
     .review-text::before {
         content: '"';
-        font-size: 2rem;
+        font-size: 1.5rem;
         color: var(--curry);
-        position: absolute;
-        top: -0.5rem;
-        left: -0.5rem;
         font-weight: 700;
+        position: absolute;
+        top: 0;
+        left: 0;
+        line-height: 1;
     }
 
     .review-text::after {
         content: '"';
-        font-size: 2rem;
+        font-size: 1.5rem;
         color: var(--curry);
         font-weight: 700;
+        margin-left: 0.1rem;
+        vertical-align: top;
+        line-height: 1;
     }
 
     .reviewer-info {
@@ -2356,7 +2382,99 @@ $default_icon = '<path d="M12 2c-1.1 0-2 .9-2 2v2H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2
 .popup-container::-webkit-scrollbar-corner {
     background: transparent;
 }
-    </style>
+
+/* Simple Footer Styles */
+.site-footer {
+    background: var(--brown);
+    color: var(--white);
+    margin-top: 4rem;
+}
+
+.footer-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 2rem;
+}
+
+.footer-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 2rem 0;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.footer-logo {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.footer-logo-text {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--white);
+    font-family: 'BaticaSans', sans-serif;
+}
+
+.footer-legal-links {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.footer-legal-links a {
+    color: var(--white);
+    text-decoration: none;
+    font-family: 'BaticaSans', sans-serif;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+}
+
+.footer-legal-links a:hover {
+    background: rgba(255, 255, 255, 0.1);
+    text-decoration: underline;
+}
+
+.footer-legal-links span {
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 1.2rem;
+}
+
+.footer-bottom {
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 1rem 0;
+    text-align: center;
+}
+
+.footer-bottom p {
+    margin: 0;
+    color: rgba(255, 255, 255, 0.8);
+    font-family: 'BaticaSans', sans-serif;
+    font-size: 0.9rem;
+}
+
+@media (max-width: 768px) {
+    .footer-content {
+        flex-direction: column;
+        text-align: center;
+        gap: 1.5rem;
+    }
+    
+    .footer-logo {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    .footer-legal-links {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+}
+</style>
 </head>
 
 <body class="has-header">
@@ -2869,6 +2987,27 @@ $default_icon = '<path d="M12 2c-1.1 0-2 .9-2 2v2H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2
             </div>
         </div>
     </section>
+
+<footer class="site-footer">
+    <div class="footer-container">
+        <div class="footer-content">
+            <div class="footer-logo">
+                <img src="./assets/image/LOGO_BG2.png" alt="Somdul Table" style="height: 50px; width: auto;">
+                <span class="footer-logo-text">Somdul Table</span>
+            </div>
+            
+            <div class="footer-legal-links">
+                <a href="./privacy.php">Privacy Policy</a>
+                <span>|</span>
+                <a href="./terms.php">Terms of Service</a>
+            </div>
+        </div>
+        
+        <div class="footer-bottom">
+            <p>&copy; 2024 Somdul Table. All rights reserved.</p>
+        </div>
+    </div>
+</footer>
 
 <script>
     // Page-specific JavaScript for index.php
