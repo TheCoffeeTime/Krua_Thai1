@@ -2420,37 +2420,22 @@ $default_icon = '<path d="M12 2c-1.1 0-2 .9-2 2v2H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2
                 <div class="image-column" data-testid="image-column">
                     <div class="image-slider-reverse">
                         <div class="video-container">
-                            <div class="video-container">
-                                <video class="hero-video" muted loop playsinline>
-                                    <source src="assets/videos/video1.mp4" type="video/mp4">
-                                    Your browser does not support the video tag.
-                                </video>
-                            </div>
+                            <img src="assets/image/menu_68b92a2acfaec.webp" alt="Pad Thai">
                         </div>
                         <div class="video-container">
-                            <img src="assets/image/image1.jpg" alt="Pad Thai">
+                            <img src="assets/image/menu_68b91b42d3caf.webp" alt="Pad Thai">
                         </div>
                         <div class="video-container">
-                            <div class="video-container">
-                                <video class="hero-video" muted loop playsinline>
-                                    <source src="assets/videos/video7.mp4" type="video/mp4">
-                                    Your browser does not support the video tag.
-                                </video>
-                            </div>
+                            <img src="assets/image/menu_68b92b4f86e25.webp" alt="Pad Thai">
                         </div>
                         <div class="video-container">
-                            <img src="assets/image/image2.jpg" alt="Pad Thai">
+                            <img src="assets/image/menu_68b92beda0f57.webp" alt="Pad Thai">
                         </div>
                         <div class="video-container">
-                            <div class="video-container">
-                                <video class="hero-video" muted loop playsinline>
-                                    <source src="assets/videos/video2.mp4" type="video/mp4">
-                                    Your browser does not support the video tag.
-                                </video>
-                            </div>
+                            <img src="assets/image/menu_68b92c7aea5ab.webp" alt="Pad Thai">
                         </div>
                         <div class="video-container">
-                            <img src="assets/image/image3.jpg" alt="Pad Thai">
+                            <img src="assets/image/menu_68b92d2c12db5.webp" alt="Pad Thai">
                         </div>
                     </div>
                 </div>
@@ -2483,7 +2468,7 @@ $default_icon = '<path d="M12 2c-1.1 0-2 .9-2 2v2H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2
                         <div class="video-container">
                             <div class="video-container">
                                 <video class="hero-video" muted loop playsinline>
-                                    <source src="assets/videos/video6.mp4" type="video/mp4">
+                                    <source src="assets/videos/THAIFOODDRAFT2.mp4" type="video/mp4">
                                     Your browser does not support the video tag.
                                 </video>
                             </div>
@@ -2498,37 +2483,22 @@ $default_icon = '<path d="M12 2c-1.1 0-2 .9-2 2v2H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2
                 <div class="image-column" data-testid="image-column">
                     <div class="image-slider-reverse">
                         <div class="video-container">
-                            <div class="video-container">
-                                <video class="hero-video" muted loop playsinline>
-                                    <source src="assets/videos/video9.mp4" type="video/mp4">
-                                    Your browser does not support the video tag.
-                                </video>
-                            </div>
+                            <img src="assets/image/menu_68b918aebf5c5.webp" alt="Pad Thai">
                         </div>
                         <div class="video-container">
-                            <img src="assets/image/image7.jpg" alt="Pad Thai">
+                            <img src="assets/image/menu_68b925b8d9c7c.webp" alt="Pad Thai">
                         </div>
                         <div class="video-container">
-                            <div class="video-container">
-                                <video class="hero-video" muted loop playsinline>
-                                    <source src="assets/videos/video9.mp4" type="video/mp4">
-                                    Your browser does not support the video tag.
-                                </video>
-                            </div>
+                            <img src="assets/image/menu_68b927b44dc48.webp" alt="Pad Thai">
                         </div>
                         <div class="video-container">
-                            <img src="assets/image/image8.jpg" alt="Pad Thai">
+                            <img src="assets/image/menu_68b9178cc4cdf.webp" alt="Pad Thai">
                         </div>
                         <div class="video-container">
-                            <div class="video-container">
-                                <video class="hero-video" muted loop playsinline>
-                                    <source src="assets/videos/video4.mp4" type="video/mp4">
-                                    Your browser does not support the video tag.
-                                </video>
-                            </div>
+                            <img src="assets/image/menu_68b926936f92e.webp" alt="Pad Thai">
                         </div>
                         <div class="video-container">
-                            <img src="assets/image/image9.jpg" alt="Pad Thai">
+                            <img src="assets/image/menu_68b928936f1f6.webp" alt="Pad Thai">
                         </div>
                     </div>
                 </div>
