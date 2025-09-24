@@ -40,27 +40,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $action = $_POST['action'] ?? '';
         
         if ($action === 'submit_complaint') {
-            // Generate complaint number
-            $complaint_number = 'COMP-' . date('Ymd') . '-' . substr(uniqid(), -6);
-            
-            // Insert complaint
-            $stmt = $pdo->prepare("
-                INSERT INTO complaints (id, complaint_number, user_id, subscription_id, category, priority, title, description, expected_resolution, status, created_at)
-                VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?, ?, 'open', NOW())
-            ");
-            
-            $stmt->execute([
-                $complaint_number,
-                $user_id,
-                $_POST['subscription_id'] ?: null,
-                $_POST['category'],
-                $_POST['priority'],
-                $_POST['title'],
-                $_POST['description'],
-                $_POST['expected_resolution'] ?: null
-            ]);
-            
-            $success_message = "Complaint submitted successfully! Complaint number: {$complaint_number}";
+            require_once 'includes/email_functions.php';// เพิ่มบรรทัดนี้
+    
+    // Generate complaint number (ใช้ format เดียวกัน)
+    $complaint_id = bin2hex(random_bytes(16));
+    $complaint_number = 'CMP-' . date('Ymd') . '-' . strtoupper(substr(md5($complaint_id), 0, 4));
+    
+    // Insert complaint (เพิ่ม id)
+    $stmt = $pdo->prepare("
+        INSERT INTO complaints (id, complaint_number, user_id, subscription_id, category, priority, title, description, expected_resolution, status, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', NOW())
+    ");
+    
+    $stmt->execute([
+        $complaint_id, // เพิ่มบรรทัดนี้
+        $complaint_number,
+        $user_id,
+        $_POST['subscription_id'] ?: null,
+        $_POST['category'],
+        $_POST['priority'],
+        $_POST['title'],
+        $_POST['description'],
+        $_POST['expected_resolution'] ?: null
+    ]);
+    
+    // เพิ่มการส่ง email (เหมือน subscription-status.php)
+    sendComplaintConfirmationEmail($pdo, $user_id, $complaint_number, $_POST);
+    sendAdminNotificationEmail($pdo, $user_id, $complaint_number, $_POST);
+    
+ $success_message = "Complaint submitted successfully! Complaint number: {$complaint_number}";
         }
         
     } catch (Exception $e) {
@@ -110,6 +118,156 @@ try {
     $user_info = $stmt->fetch(PDO::FETCH_ASSOC);
 } catch (Exception $e) {
     $user_info = ['first_name' => '', 'last_name' => '', 'email' => '', 'phone' => ''];
+}
+
+// Email Functions
+function sendComplaintConfirmationEmail($pdo, $userId, $complaintNumber, $complaintData) {
+    // Get user info
+    $stmt = $pdo->prepare("SELECT first_name, last_name, email FROM users WHERE id = ?");
+    $stmt->execute([$userId]);
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if (!$user) return false;
+    
+    $customerName = $user['first_name'] . ' ' . $user['last_name'];
+    $customerEmail = $user['email'];
+    
+    $subject = "[Somdul Table] รับแจ้งปัญหา #{$complaintNumber}";
+    
+    $emailBody = "
+    <html>
+    <head>
+        <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
+            .container { max-width: 600px; margin: 0 auto; background: #fff; }
+            .header { background: linear-gradient(135deg, #cf723a, #e67e22); color: white; padding: 30px 20px; text-align: center; }
+            .content { padding: 30px 20px; }
+            .complaint-box { background: #f8f9fa; border-left: 5px solid #cf723a; padding: 20px; margin: 20px 0; border-radius: 5px; }
+            .info-box { background: linear-gradient(135deg, #3498db, #2980b9); color: white; padding: 20px; border-radius: 10px; margin: 20px 0; }
+            .footer { background: #ece8e1; padding: 20px; text-align: center; color: #666; }
+            .highlight { color: #cf723a; font-weight: bold; }
+        </style>
+    </head>
+    <body>
+        <div class='container'>
+            <div class='header'>
+                <h1 style='margin: 0; font-size: 2rem;'>🍽️ Somdul Table</h1>
+                <p style='margin: 10px 0 0 0; font-size: 1.2rem;'>ยืนยันการรับแจ้งปัญหา</p>
+            </div>
+            
+            <div class='content'>
+                <h2>เรียน คุณ {$customerName}</h2>
+                
+                <p>ขอบคุณที่แจ้งปัญหาให้เราทราบ เราได้รับเรื่องของท่านแล้วและจะดำเนินการแก้ไขโดยเร็วที่สุด</p>
+                
+                <div class='complaint-box'>
+                    <h3 style='margin-top: 0; color: #cf723a;'>📋 รายละเอียดการแจ้งปัญหา</h3>
+                    <p><strong>รหัสอ้างอิง:</strong> <span class='highlight'>#{$complaintNumber}</span></p>
+                    <p><strong>หัวข้อ:</strong> {$complaintData['title']}</p>
+                    <p><strong>ประเภท:</strong> " . ucfirst(str_replace('_', ' ', $complaintData['category'])) . "</p>
+                    <p><strong>ระดับความสำคัญ:</strong> " . ucfirst($complaintData['priority']) . "</p>
+                    <p><strong>วันที่แจ้ง:</strong> " . date('d/m/Y H:i น.') . "</p>
+                </div>
+                
+                <div class='info-box'>
+                    <h3 style='margin-top: 0;'>⏰ ขั้นตอนต่อไป</h3>
+                    <p style='margin: 10px 0;'>✅ ทีมงานจะตรวจสอบและติดต่อกลับภายใน <strong>4 ชั่วโมง</strong></p>
+                    <p style='margin: 10px 0;'>✅ ท่านสามารถตอบกลับอีเมลนี้ได้โดยตรง ไม่ต้องเข้าเว็บไซต์อีกครั้ง</p>
+                    <p style='margin: 10px 0;'>✅ กรณีเร่งด่วน: โทร <strong>(02) 123-4567</strong></p>
+                </div>
+                
+                <p>เราขออภัยในความไม่สะดวก และขอบคุณที่ให้โอกาสเราปรับปรุงการบริการให้ดียิ่งขึ้น</p>
+                
+                <p>ด้วยความห่วงใย<br>
+                <strong>Somdul Table Support Team</strong></p>
+            </div>
+            
+            <div class='footer'>
+                <p><strong>Somdul Table - Authentic Thai Meals, Made Healthy</strong></p>
+                <p>📧 support@somdultable.com | 📞 (02) 123-4567</p>
+                <p style='font-size: 0.9em; margin-top: 15px;'>
+                    อีเมลนี้ส่งเกี่ยวกับการแจ้งปัญหา #{$complaintNumber}
+                </p>
+            </div>
+        </div>
+    </body>
+    </html>";
+    
+    return sendRealEmail($customerEmail, $subject, $emailBody);
+}
+
+function sendAdminNotificationEmail($pdo, $userId, $complaintNumber, $complaintData) {
+    // Get customer info
+    $stmt = $pdo->prepare("SELECT first_name, last_name, email, phone FROM users WHERE id = ?");
+    $stmt->execute([$userId]);
+    $customer = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if (!$customer) return false;
+    
+    $customerName = $customer['first_name'] . ' ' . $customer['last_name'];
+    $adminEmail = 'admin@kruathai.com';
+    
+    $subject = "[🚨 URGENT] New Complaint #{$complaintNumber} - " . ucfirst(str_replace('_', ' ', $complaintData['category']));
+    
+    $priorityColor = $complaintData['priority'] === 'critical' ? '#c0392b' : 
+                    ($complaintData['priority'] === 'high' ? '#e74c3c' : '#f39c12');
+    
+    $emailBody = "
+    <html>
+    <head>
+        <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
+            .container { max-width: 700px; margin: 0 auto; background: #fff; }
+            .header { background: linear-gradient(135deg, #cf723a, #e67e22); color: white; padding: 25px; text-align: center; }
+            .priority-{$complaintData['priority']} { border-left: 5px solid {$priorityColor}; padding: 15px; margin: 20px 0; }
+            .customer-info { background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 15px 0; }
+            .complaint-details { background: #e8f4f8; padding: 20px; border-radius: 8px; margin: 15px 0; }
+            .action-button { background: #cf723a; color: white; padding: 12px 25px; text-decoration: none; border-radius: 6px; display: inline-block; margin: 10px 0; }
+            .footer { background: #f1f1f1; padding: 20px; text-align: center; color: #666; }
+        </style>
+    </head>
+    <body>
+        <div class='container'>
+            <div class='header'>
+                <h1 style='margin: 0;'>🚨 New Customer Complaint Alert</h1>
+                <p style='margin: 10px 0 0 0; font-size: 1.1rem;'>Requires Immediate Attention</p>
+            </div>
+            
+            <div style='padding: 25px;'>
+                <div class='priority-{$complaintData['priority']}'>
+                    <h2 style='margin: 0 0 10px 0; color: {$priorityColor};'>Complaint #{$complaintNumber}</h2>
+                    <p style='margin: 0; font-size: 1.1rem;'><strong>Priority:</strong> " . strtoupper($complaintData['priority']) . "</p>
+                </div>
+                
+                <div class='customer-info'>
+                    <h3 style='margin: 0 0 15px 0; color: #cf723a;'>👤 Customer Information</h3>
+                    <p><strong>Name:</strong> {$customerName}</p>
+                    <p><strong>Email:</strong> {$customer['email']}</p>
+                    <p><strong>Phone:</strong> " . ($customer['phone'] ?: 'Not provided') . "</p>
+                </div>
+                
+                <div class='complaint-details'>
+                    <h3 style='margin: 0 0 15px 0; color: #2980b9;'>📋 Complaint Details</h3>
+                    <p><strong>Category:</strong> " . ucfirst(str_replace('_', ' ', $complaintData['category'])) . "</p>
+                    <p><strong>Subject:</strong> {$complaintData['title']}</p>
+                    <p><strong>Description:</strong></p>
+                    <div style='background: white; padding: 15px; border-radius: 5px; margin-top: 10px;'>
+                        " . nl2br(htmlspecialchars($complaintData['description'])) . "
+                    </div>
+                    <p><strong>Submitted:</strong> " . date('d/m/Y H:i น.') . "</p>
+                </div>
+                
+                <div style='text-align: center; margin: 30px 0;'>
+                    <a href='https://somdultable.com/admin/complaints.php' class='action-button'>
+                        📝 Respond to Complaint Now
+                    </a>
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>";
+    
+    return sendRealEmail($adminEmail, $subject, $emailBody);
 }
 ?>
 
