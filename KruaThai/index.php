@@ -102,10 +102,11 @@ try {
     // Fetch categories for navigation
     $categories = [];
     $stmt = $pdo->prepare("
-        SELECT id, name, name_thai 
-        FROM menu_categories 
-        WHERE is_active = 1 
-        ORDER BY sort_order ASC
+        SELECT DISTINCT mc.id, mc.name, mc.name_thai, mc.sort_order
+        FROM menu_categories mc
+        INNER JOIN menus m ON mc.id = m.category_id
+        WHERE mc.is_active = 1 AND m.is_available = 1
+        ORDER BY mc.sort_order ASC
     ");
     $stmt->execute();
     $categories = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -2691,16 +2692,24 @@ $default_icon = '<path d="M12 2c-1.1 0-2 .9-2 2v2H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2
     <section class="menu-section" id="menu">
         <div class="menu-container">            
             <div class="menu-nav-container">
+                <!-- Left scroll button -->
                 <button class="menu-nav-scroll-btn menu-nav-scroll-left" id="menuScrollLeft" aria-label="Scroll left">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                     </svg>
                 </button>
                 
+                <!-- Right scroll button -->
+                <button class="menu-nav-scroll-btn menu-nav-scroll-right" id="menuScrollRight" aria-label="Scroll right">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M9 18L15 12L9 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+                
                 <div class="menu-nav-wrapper" id="menuNavWrapper">
                     <div class="menu-nav-list">
                         <?php if (empty($categories)): ?>
-                            <!-- Fallback categories if database is empty -->
+                            <!-- Fallback if no categories are available -->
                             <button class="menu-nav-item active" data-category="all">
                                 <span class="menu-nav-icon">
                                     <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -2720,7 +2729,7 @@ $default_icon = '<path d="M12 2c-1.1 0-2 .9-2 2v2H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2
                                 <span class="menu-nav-text">All Items</span>
                             </button>
                             
-                            <!-- Dynamic categories from database -->
+                            <!-- Dynamic categories from database (only available ones) -->
                             <?php foreach ($categories as $index => $category): ?>
                                 <?php 
                                 $category_name = $category['name'] ?: $category['name_thai'];
@@ -2732,20 +2741,12 @@ $default_icon = '<path d="M12 2c-1.1 0-2 .9-2 2v2H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2
                                             <?php echo $icon_path; ?>
                                         </svg>
                                     </span>
-                                    <span class="menu-nav-text">
-                                        <?php echo htmlspecialchars($category_name); ?>
-                                    </span>
+                                    <span class="menu-nav-text"><?php echo htmlspecialchars($category_name); ?></span>
                                 </button>
                             <?php endforeach; ?>
                         <?php endif; ?>
                     </div>
                 </div>
-                
-                <button class="menu-nav-scroll-btn menu-nav-scroll-right" id="menuScrollRight" aria-label="Scroll right">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M9 18L15 12L9 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                </button>
             </div>
 
             <div class="meal-cards-container">

@@ -24,10 +24,11 @@ try {
     // Fetch categories
     $categories = [];
     $stmt = $pdo->prepare("
-        SELECT id, name, name_thai 
-        FROM menu_categories 
-        WHERE is_active = 1 
-        ORDER BY sort_order ASC
+        SELECT DISTINCT mc.id, mc.name, mc.name_thai, mc.sort_order
+        FROM menu_categories mc
+        INNER JOIN menus m ON mc.id = m.category_id
+        WHERE mc.is_active = 1 AND m.is_available = 1
+        ORDER BY mc.sort_order ASC
     ");
     $stmt->execute();
     $categories = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -117,6 +118,43 @@ try {
 } catch (Exception $e) {
     // Use fallback
 }
+
+// Category icons mapping
+$category_icons = [
+    // Rice bowl with steam and chopsticks
+    'Rice Bowls' => '<path d="M12 2c-3.31 0-6 2.69-6 6v1c0 2.21 1.79 4 4 4h4c2.21 0 4-1.79 4-4V8c0-3.31-2.69-6-6-6zm-4 7V8c0-2.21 1.79-4 4-4s4 1.79 4 4v1c0 1.1-.9 2-2 2h-4c-1.1 0-2-.9-2-2z"/><path d="M3 15h2l2 7h10l2-7h2v2l-2 6H5l-2-6v-2z"/><circle cx="10" cy="6" r="0.5"/><circle cx="14" cy="6" r="0.5"/><circle cx="12" cy="7" r="0.5"/>',
+    
+    // Curry pot with steam swirls
+    'Thai Curries & Soups' => '<path d="M7 12c-1.1 0-2 .9-2 2v6c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2v-6c0-1.1-.9-2-2-2H7zm0 2h10v6H7v-6z"/><path d="M9 8c0-1.1.9-2 2-2h2c1.1 0 2 .9 2 2v2h-6V8z"/><path d="M8 4c.5-.5 1-.5 1.5 0s.5 1 0 1.5-.5.5-1 .5S8 5.5 8 4zm4-2c.5-.5 1-.5 1.5 0s.5 1 0 1.5-.5.5-1 .5S12 2.5 12 2zm4 2c.5-.5 1-.5 1.5 0s.5 1 0 1.5-.5.5-1 .5S16 4.5 16 4z"/><circle cx="12" cy="16" r="1"/>',
+    
+    // Glass with ice cubes and straw
+    'Beverages' => '<path d="M8 2v2h8V2H8zm0 4v14c0 1.1.9 2 2 2h4c1.1 0 2-.9 2-2V6H8zm6 12h-4v-2h4v2zm0-4h-4v-2h4v2zm0-4h-4V8h4v2z"/><path d="M17 4h2v16h-2V4z"/><rect x="9" y="8" width="1" height="1"/><rect x="11" y="9" width="1" height="1"/><rect x="13" y="8" width="1" height="1"/>',
+    
+    // Sandwich/wrap with layers
+    'Sandwiches' => '<path d="M2 8c0-1.1.9-2 2-2h16c1.1 0 2 .9 2 2v1H2V8z"/><path d="M2 10h20v1c0 .55-.45 1-1 1H3c-.55 0-1-.45-1-1v-1z"/><path d="M3 13h18c.55 0 1 .45 1 1v1H2v-1c0-.55.45-1 1-1z"/><path d="M2 16h20v1c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2v-1z"/><circle cx="6" cy="9.5" r="0.5" fill="#cf723a"/><circle cx="9" cy="9.5" r="0.5" fill="#28a745"/><circle cx="12" cy="9.5" r="0.5" fill="#dc3545"/><circle cx="15" cy="13.5" r="0.5" fill="#cf723a"/><circle cx="18" cy="13.5" r="0.5" fill="#28a745"/>',
+    
+    // Wok with ingredients flying up
+    'Stir Fry Dishes' => '<path d="M4 14c0-4.41 3.59-8 8-8s8 3.59 8 8c0 2.21-.9 4.21-2.35 5.65L12 15l-5.65 4.65C4.9 18.21 4 16.21 4 14z"/><path d="M12 8c-3.31 0-6 2.69-6 6 0 1.66.67 3.16 1.76 4.24l.71-.71C7.61 16.67 7.19 15.38 7.19 14c0-2.65 2.15-4.81 4.81-4.81s4.81 2.15 4.81 4.81c0 1.38-.43 2.67-1.28 3.53l.71.71C17.33 17.16 18 15.66 18 14c0-3.31-2.69-6-6-6z"/><circle cx="8" cy="4" r="1" fill="#28a745"/><circle cx="12" cy="2" r="1" fill="#dc3545"/><circle cx="16" cy="4" r="1" fill="#ffc107"/><circle cx="20" cy="6" r="1" fill="#28a745"/>',
+    
+    // Grill grate with flames
+    'Grilled & BBQ' => '<path d="M2 14h20v2H2v-2zm0 4h20v2H2v-2zm0-8h20v2H2v-2z"/><path d="M4 18l2-4 2 4 2-4 2 4 2-4 2 4 2-4 2 4 2-4v6H4v-6z" fill="#cf723a" opacity="0.6"/><path d="M6 8c0-1 1-2 1-2s1 1 1 2-1 1-1 1-1 0-1-1zm4-2c0-1 1-2 1-2s1 1 1 2-1 1-1 1-1 0-1-1zm4 0c0-1 1-2 1-2s1 1 1 2-1 1-1 1-1 0-1-1zm4 2c0-1 1-2 1-2s1 1 1 2-1 1-1 1-1 0-1-1z" fill="#dc3545"/>',
+    
+    // Leafy salad bowl with vegetables
+    'Salads' => '<path d="M12 2c-1.1 0-2 .9-2 2 0 .74.4 1.38 1 1.73V7c-3.31 0-6 2.69-6 6v5c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2v-5c0-3.31-2.69-6-6-6V5.73c.6-.35 1-.99 1-1.73 0-1.1-.9-2-2-2z"/><path d="M7 13c0-2.76 2.24-5 5-5s5 2.24 5 5v5H7v-5z"/><circle cx="9" cy="15" r="1" fill="#28a745"/><circle cx="15" cy="14" r="1" fill="#dc3545"/><circle cx="11" cy="16" r="0.5" fill="#ffc107"/><circle cx="13" cy="17" r="0.5" fill="#28a745"/>',
+    
+    // Fish with scales and fins
+    'Seafood Specialties' => '<path d="M12 4c-4 0-8 3-8 7s4 7 8 7c2.5 0 4.8-1.2 6.4-3.2L22 12l-3.6-2.8C16.8 7.2 14.5 6 12 4zm0 2c2 0 3.8.8 5.1 2.2L19.2 12l-2.1 1.8C15.8 15.2 14 16 12 16c-3.1 0-6-2.2-6-5s2.9-5 6-5z"/><circle cx="15" cy="10" r="1.5"/><path d="M2 12l3-1v2l-3-1z"/><path d="M12 8c0-1 .5-2 .5-2S14 7 14 8s-1 1-1 1-.5-.5-.5-1z"/><path d="M12 16c0 1-.5 2-.5 2S10 17 10 16s1-1 1-1 .5.5.5 1z"/>',
+    
+    // Layered cake with cherry on top
+    'Desserts' => '<path d="M12 2l-2 2h4l-2-2zm0 20c4.97 0 9-4.03 9-9H3c0 4.97 4.03 9 9 9z"/><path d="M5 11h14v2H5v-2z"/><path d="M6 14h12v2H6v-2z"/><path d="M7 17h10v1H7v-1z"/><circle cx="12" cy="5" r="1" fill="#dc3545"/><path d="M12 5c0 .5-.2 1-.5 1.3L11 7h2l-.5-.7C12.2 6 12 5.5 12 5z" fill="#28a745"/>',
+    
+    // Noodles with chopsticks
+    'Noodle Dishes' => '<path d="M5 12c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2v6c0 1.1-.9 2-2 2H7c-1.1 0-2-.9-2-2v-6z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M7 14h10" stroke="currentColor" stroke-width="1.5"/><path d="M7 16h10" stroke="currentColor" stroke-width="1.5"/><path d="M7 18h10" stroke="currentColor" stroke-width="1.5"/><line x1="2" y1="4" x2="8" y2="10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="22" y1="4" x2="16" y2="10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
+];
+
+// Default icon for categories not in mapping
+$default_icon = '<path d="M12 2c-1.1 0-2 .9-2 2v2H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-2V4c0-1.1-.9-2-2-2zm0 2v2h-2V4h2zm-4 4h8v2h-8V8zm0 4h8v6H8v-6z"/>';
+
 
 ?>
 <!DOCTYPE html>
@@ -625,96 +663,66 @@ try {
         <div class="container">
 
             <!-- Menu Navigation Container -->
-            <div class="menu-nav-container">
-                <button class="menu-nav-scroll-btn menu-nav-scroll-left" id="menuScrollLeft" aria-label="Scroll left">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                </button>
+            <!-- Updated Menu Navigation Container for menus.php -->
+<div class="menu-nav-container">
+    <button class="menu-nav-scroll-btn menu-nav-scroll-left" id="menuScrollLeft" aria-label="Scroll left">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+    </button>
+    
+    <div class="menu-nav-wrapper" id="menuNavWrapper">
+        <div class="menu-nav-list">
+            <?php if (empty($categories)): ?>
+                <!-- Fallback if no categories available -->
+                <a href="menus.php" class="menu-nav-item <?php echo empty($category_id) ? 'active' : ''; ?>">
+                    <span class="menu-nav-icon">
+                        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <?php echo $default_icon; ?>
+                        </svg>
+                    </span>
+                    <span class="menu-nav-text">All Items</span>
+                </a>
+            <?php else: ?>
+                <!-- All items link -->
+                <a href="menus.php" class="menu-nav-item <?php echo empty($category_id) ? 'active' : ''; ?>">
+                    <span class="menu-nav-icon">
+                        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/>
+                        </svg>
+                    </span>
+                    <span class="menu-nav-text">All Items</span>
+                </a>
                 
-                <div class="menu-nav-wrapper" id="menuNavWrapper">
-                    <div class="menu-nav-list">
-                        <?php if (empty($categories)): ?>
-                            <a href="menus.php" class="menu-nav-item <?php echo empty($category_id) ? 'active' : ''; ?>">
-                                <span class="menu-nav-icon">
-                                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                        <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/>
-                                    </svg>
-                                </span>
-                                <span class="menu-nav-text">All Items</span>
-                            </a>
-                        <?php else: ?>
-                            <a href="menus.php" class="menu-nav-item <?php echo empty($category_id) ? 'active' : ''; ?>">
-                                <span class="menu-nav-icon">
-                                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                        <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/>
-                                    </svg>
-                                </span>
-                                <span class="menu-nav-text">All Items</span>
-                            </a>
-                            
-                            <?php 
-                            $category_icons = [
-    // Rice bowl with steam and chopsticks
-    'Rice Bowls' => '<path d="M12 2c-3.31 0-6 2.69-6 6v1c0 2.21 1.79 4 4 4h4c2.21 0 4-1.79 4-4V8c0-3.31-2.69-6-6-6zm-4 7V8c0-2.21 1.79-4 4-4s4 1.79 4 4v1c0 1.1-.9 2-2 2h-4c-1.1 0-2-.9-2-2z"/><path d="M3 15h2l2 7h10l2-7h2v2l-2 6H5l-2-6v-2z"/><circle cx="10" cy="6" r="0.5"/><circle cx="14" cy="6" r="0.5"/><circle cx="12" cy="7" r="0.5"/>',
+                <!-- Dynamic category links (only available ones) -->
+                <?php foreach ($categories as $category): ?>
+                    <?php 
+                    $category_name = $category['name'] ?: $category['name_thai'];
+                    $icon_path = $category_icons[$category_name] ?? $default_icon;
+                    $is_active = ($category_id == $category['id']) ? 'active' : '';
+                    ?>
+                    <a href="menus.php?category_id=<?php echo htmlspecialchars($category['id']); ?>" 
+                       class="menu-nav-item <?php echo $is_active; ?>">
+                        <span class="menu-nav-icon">
+                            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <?php echo $icon_path; ?>
+                            </svg>
+                        </span>
+                        <span class="menu-nav-text">
+                            <?php echo htmlspecialchars($category_name); ?>
+                        </span>
+                    </a>
+                <?php endforeach; ?>
+            <?php endif; ?>
+        </div>
+    </div>
     
-    // Curry pot with steam swirls
-    'Thai Curries & Soups' => '<path d="M7 12c-1.1 0-2 .9-2 2v6c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2v-6c0-1.1-.9-2-2-2H7zm0 2h10v6H7v-6z"/><path d="M9 8c0-1.1.9-2 2-2h2c1.1 0 2 .9 2 2v2h-6V8z"/><path d="M8 4c.5-.5 1-.5 1.5 0s.5 1 0 1.5-.5.5-1 .5S8 5.5 8 4zm4-2c.5-.5 1-.5 1.5 0s.5 1 0 1.5-.5.5-1 .5S12 2.5 12 2zm4 2c.5-.5 1-.5 1.5 0s.5 1 0 1.5-.5.5-1 .5S16 4.5 16 4z"/><circle cx="12" cy="16" r="1"/>',
-    
-    // Glass with ice cubes and straw
-    'Beverages' => '<path d="M8 2v2h8V2H8zm0 4v14c0 1.1.9 2 2 2h4c1.1 0 2-.9 2-2V6H8zm6 12h-4v-2h4v2zm0-4h-4v-2h4v2zm0-4h-4V8h4v2z"/><path d="M17 4h2v16h-2V4z"/><rect x="9" y="8" width="1" height="1"/><rect x="11" y="9" width="1" height="1"/><rect x="13" y="8" width="1" height="1"/>',
-    
-    // Sandwich/wrap with layers
-    'Sandwiches' => '<path d="M2 8c0-1.1.9-2 2-2h16c1.1 0 2 .9 2 2v1H2V8z"/><path d="M2 10h20v1c0 .55-.45 1-1 1H3c-.55 0-1-.45-1-1v-1z"/><path d="M3 13h18c.55 0 1 .45 1 1v1H2v-1c0-.55.45-1 1-1z"/><path d="M2 16h20v1c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2v-1z"/><circle cx="6" cy="9.5" r="0.5" fill="#cf723a"/><circle cx="9" cy="9.5" r="0.5" fill="#28a745"/><circle cx="12" cy="9.5" r="0.5" fill="#dc3545"/><circle cx="15" cy="13.5" r="0.5" fill="#cf723a"/><circle cx="18" cy="13.5" r="0.5" fill="#28a745"/>',
-    
-    // Wok with ingredients flying up
-    'Stir Fry Dishes' => '<path d="M4 14c0-4.41 3.59-8 8-8s8 3.59 8 8c0 2.21-.9 4.21-2.35 5.65L12 15l-5.65 4.65C4.9 18.21 4 16.21 4 14z"/><path d="M12 8c-3.31 0-6 2.69-6 6 0 1.66.67 3.16 1.76 4.24l.71-.71C7.61 16.67 7.19 15.38 7.19 14c0-2.65 2.15-4.81 4.81-4.81s4.81 2.15 4.81 4.81c0 1.38-.43 2.67-1.28 3.53l.71.71C17.33 17.16 18 15.66 18 14c0-3.31-2.69-6-6-6z"/><circle cx="8" cy="4" r="1" fill="#28a745"/><circle cx="12" cy="2" r="1" fill="#dc3545"/><circle cx="16" cy="4" r="1" fill="#ffc107"/><circle cx="20" cy="6" r="1" fill="#28a745"/>',
-    
-    // Grill grate with flames
-    'Grilled & BBQ' => '<path d="M2 14h20v2H2v-2zm0 4h20v2H2v-2zm0-8h20v2H2v-2z"/><path d="M4 18l2-4 2 4 2-4 2 4 2-4 2 4 2-4 2 4 2-4v6H4v-6z" fill="#cf723a" opacity="0.6"/><path d="M6 8c0-1 1-2 1-2s1 1 1 2-1 1-1 1-1 0-1-1zm4-2c0-1 1-2 1-2s1 1 1 2-1 1-1 1-1 0-1-1zm4 0c0-1 1-2 1-2s1 1 1 2-1 1-1 1-1 0-1-1zm4 2c0-1 1-2 1-2s1 1 1 2-1 1-1 1-1 0-1-1z" fill="#dc3545"/>',
-    
-    // Leafy salad bowl with vegetables
-    'Salads' => '<path d="M12 2c-1.1 0-2 .9-2 2 0 .74.4 1.38 1 1.73V7c-3.31 0-6 2.69-6 6v5c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2v-5c0-3.31-2.69-6-6-6V5.73c.6-.35 1-.99 1-1.73 0-1.1-.9-2-2-2z"/><path d="M7 13c0-2.76 2.24-5 5-5s5 2.24 5 5v5H7v-5z"/><circle cx="9" cy="15" r="1" fill="#28a745"/><circle cx="15" cy="14" r="1" fill="#dc3545"/><circle cx="11" cy="16" r="0.5" fill="#ffc107"/><circle cx="13" cy="17" r="0.5" fill="#28a745"/>',
-    
-    // Fish with scales and fins
-    'Seafood Specialties' => '<path d="M12 4c-4 0-8 3-8 7s4 7 8 7c2.5 0 4.8-1.2 6.4-3.2L22 12l-3.6-2.8C16.8 7.2 14.5 6 12 4zm0 2c2 0 3.8.8 5.1 2.2L19.2 12l-2.1 1.8C15.8 15.2 14 16 12 16c-3.1 0-6-2.2-6-5s2.9-5 6-5z"/><circle cx="15" cy="10" r="1.5"/><path d="M2 12l3-1v2l-3-1z"/><path d="M12 8c0-1 .5-2 .5-2S14 7 14 8s-1 1-1 1-.5-.5-.5-1z"/><path d="M12 16c0 1-.5 2-.5 2S10 17 10 16s1-1 1-1 .5.5.5 1z"/>',
-    
-    // Layered cake with cherry on top
-    'Desserts' => '<path d="M12 2l-2 2h4l-2-2zm0 20c4.97 0 9-4.03 9-9H3c0 4.97 4.03 9 9 9z"/><path d="M5 11h14v2H5v-2z"/><path d="M6 14h12v2H6v-2z"/><path d="M7 17h10v1H7v-1z"/><circle cx="12" cy="5" r="1" fill="#dc3545"/><path d="M12 5c0 .5-.2 1-.5 1.3L11 7h2l-.5-.7C12.2 6 12 5.5 12 5z" fill="#28a745"/>',
-    
-    // Noodles with chopsticks
-    'Noodle Dishes' => '<path d="M5 12c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2v6c0 1.1-.9 2-2 2H7c-1.1 0-2-.9-2-2v-6z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M7 14h10" stroke="currentColor" stroke-width="1.5"/><path d="M7 16h10" stroke="currentColor" stroke-width="1.5"/><path d="M7 18h10" stroke="currentColor" stroke-width="1.5"/><line x1="2" y1="4" x2="8" y2="10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="22" y1="4" x2="16" y2="10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
-];
-                            
-                            $default_icon = '<path d="M12 2c-1.1 0-2 .9-2 2v2H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-2V4c0-1.1-.9-2-2-2zm0 2v2h-2V4h2zm-4 4h8v2h-8V8zm0 4h8v6H8v-6z"/>';
-                            
-                            foreach ($categories as $category): 
-                                $category_name = $category['name'] ?: $category['name_thai'];
-                                $icon_path = $category_icons[$category_name] ?? $default_icon;
-                                $is_active = ($category_id == $category['id']) ? 'active' : '';
-                            ?>
-                                <a href="menus.php?category_id=<?php echo $category['id']; ?>" 
-                                   class="menu-nav-item <?php echo $is_active; ?>">
-                                    <span class="menu-nav-icon">
-                                        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                            <?php echo $icon_path; ?>
-                                        </svg>
-                                    </span>
-                                    <span class="menu-nav-text">
-                                        <?php echo htmlspecialchars($category_name); ?>
-                                    </span>
-                                </a>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
-                    </div>
-                </div>
-                
-                <button class="menu-nav-scroll-btn menu-nav-scroll-right" id="menuScrollRight" aria-label="Scroll right">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M9 18L15 12L9 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                </button>
-            </div>
+    <button class="menu-nav-scroll-btn menu-nav-scroll-right" id="menuScrollRight" aria-label="Scroll right">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M9 18L15 12L9 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+    </button>
+</div>
 
             <!-- Results Header -->
             <div class="results-header">

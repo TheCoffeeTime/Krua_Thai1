@@ -19,6 +19,44 @@ require_once 'config/database.php';
 require_once 'includes/functions.php';
 require_once 'classes/User.php';
 
+// ADD THIS SESSION VALIDATION FUNCTION HERE:
+/**
+ * Validate and refresh user session data
+ * Ensures session is consistent with database and user still exists
+ */
+function validateAndRefreshSession($db, $user_id) {
+    try {
+        $stmt = $db->prepare("SELECT * FROM users WHERE id = :user_id AND status = 'active'");
+        $stmt->bindParam(':user_id', $user_id);
+        $stmt->execute();
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$user) {
+            // User doesn't exist or is inactive - destroy session
+            error_log("Session validation failed - user not found or inactive: " . $user_id);
+            session_destroy();
+            header('Location: login.php?error=session_expired');
+            exit();
+        }
+        
+        // Refresh session data with current database values
+        $_SESSION['user_id'] = $user['id'];
+        $_SESSION['user_email'] = $user['email'];
+        $_SESSION['user_name'] = trim($user['first_name'] . ' ' . $user['last_name']);
+        $_SESSION['user_role'] = $user['role'] ?? 'customer';
+        $_SESSION['profile_complete'] = (bool)$user['profile_complete'];
+        
+        error_log("Session validated and refreshed for user: " . $user['id']);
+        return $user;
+        
+    } catch (Exception $e) {
+        error_log("Session validation error: " . $e->getMessage());
+        session_destroy();
+        header('Location: login.php?error=technical_error');
+        exit();
+    }
+}
+
 $database = new Database();
 $db = $database->getConnection();
 
