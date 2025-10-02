@@ -1,9 +1,10 @@
 <?php
 /**
- * Krua Thai - Improved Edit Profile Page
+ * Somdul Table - Edit Profile Page  
  * File: edit_profile.php
  * Status: PRODUCTION READY ✅
  * Enhanced UX with progressive disclosure, auto-save, and smart validation
+ * UPDATED: Now uses header.php for consistent navigation and styling
  */
 
 error_reporting(E_ALL);
@@ -19,6 +20,9 @@ if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
 require_once 'config/database.php';
 require_once 'includes/functions.php';
 
+// Include the header (contains navbar, promo banner, fonts, and base styles)
+include 'header.php';
+
 $user_id = $_SESSION['user_id'];
 $errors = [];
 $success_message = "";
@@ -28,11 +32,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['action'])) {
     header('Content-Type: application/json');
     $action = $_POST['action'];
 
-error_log("=== DEBUG ===");
+    error_log("=== DEBUG ===");
     error_log("POST data: " . print_r($_POST, true));
     error_log("Dietary: " . print_r($_POST['dietary_preferences'] ?? 'NOT SET', true));
     error_log("Allergies: " . print_r($_POST['allergies'] ?? 'NOT SET', true));
-
 
     $response = ['success' => false, 'errors' => [], 'message' => ''];
 
@@ -132,8 +135,8 @@ error_log("=== DEBUG ===");
                 $city = sanitizeInput($_POST['city'] ?? '');
                 $zip_code = sanitizeInput($_POST['zip_code'] ?? '');
                 $delivery_instructions = sanitizeInput($_POST['delivery_instructions'] ?? '');
-                $dietary_preferences = $_POST['dietary_preferences'] ?? [];$dietary_preferences = isset($_POST['dietary_preferences']) ? json_encode($_POST['dietary_preferences']) : '[]';
-$allergies = isset($_POST['allergies']) ? json_encode($_POST['allergies']) : '[]';    
+                $dietary_preferences = isset($_POST['dietary_preferences']) ? json_encode($_POST['dietary_preferences']) : '[]';
+                $allergies = isset($_POST['allergies']) ? json_encode($_POST['allergies']) : '[]';    
                 $spice_level = sanitizeInput($_POST['spice_level'] ?? 'medium');
 
                 // Enhanced validation
@@ -157,18 +160,18 @@ $allergies = isset($_POST['allergies']) ? json_encode($_POST['allergies']) : '[]
                     $response['errors'][] = ['field' => 'zip_code', 'message' => 'Please enter a valid ZIP code'];
                 }
 
-              if (empty($response['errors'])) {
-    $sql = "UPDATE users SET 
-        first_name = ?, last_name = ?, phone = ?, date_of_birth = ?, gender = ?,
-        delivery_address = ?, city = ?, zip_code = ?, delivery_instructions = ?,
-        dietary_preferences = ?, allergies = ?, spice_level = ?, updated_at = NOW() 
-    WHERE id = ?";
-    $stmt = $pdo->prepare($sql);
-               $stmt->execute([
-    $first_name, $last_name, $phone, $date_of_birth, $gender, 
-    $delivery_address, $city, $zip_code, $delivery_instructions, 
-    $dietary_preferences, $allergies, $spice_level, $user_id
-]);
+                if (empty($response['errors'])) {
+                    $sql = "UPDATE users SET 
+                        first_name = ?, last_name = ?, phone = ?, date_of_birth = ?, gender = ?,
+                        delivery_address = ?, city = ?, zip_code = ?, delivery_instructions = ?,
+                        dietary_preferences = ?, allergies = ?, spice_level = ?, updated_at = NOW() 
+                    WHERE id = ?";
+                    $stmt = $pdo->prepare($sql);
+                    $stmt->execute([
+                        $first_name, $last_name, $phone, $date_of_birth, $gender, 
+                        $delivery_address, $city, $zip_code, $delivery_instructions, 
+                        $dietary_preferences, $allergies, $spice_level, $user_id
+                    ]);
 
                     $response['success'] = true;
                     $response['message'] = "Profile updated successfully! 🎉";
@@ -176,7 +179,7 @@ $allergies = isset($_POST['allergies']) ? json_encode($_POST['allergies']) : '[]
                 }
                 break;
 
-case 'update_preferences':
+            case 'update_preferences':
                 // อัพเดท Food Preferences เท่านั้น
                 $dietary_preferences = isset($_POST['dietary_preferences']) ? json_encode($_POST['dietary_preferences']) : '[]';
                 $allergies = isset($_POST['allergies']) ? json_encode($_POST['allergies']) : '[]';
@@ -233,7 +236,7 @@ case 'update_preferences':
                         $stmt = $pdo->prepare("UPDATE users SET password_hash = ?, updated_at = NOW() WHERE id = ?");
                         $stmt->execute([$hashed_password, $user_id]);
                         $response['success'] = true;
-                        $response['message'] = "Password changed successfully! 🔒";
+                        $response['message'] = "Password changed successfully! 🔐";
                     } else {
                         $response['errors'][] = ['field' => 'current_password', 'message' => 'Current password is incorrect'];
                     }
@@ -272,223 +275,17 @@ $page_title = "Edit Profile";
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo htmlspecialchars($page_title); ?> - Krua Thai</title>
+    <title><?php echo htmlspecialchars($page_title); ?> - Somdul Table</title>
     
-    <!-- BaticaSans Font Import -->
-    <link rel="preconnect" href="https://ydpschool.com">
     <style>
-       @font-face {
-            font-family: 'BaticaSans';
-            src: url('https://ydpschool.com/fonts/BaticaSans-Regular.woff2') format('woff2');
-            font-weight: 400;
-            font-style: normal;
-            font-display: swap;
-        }
+        /* EDIT PROFILE SPECIFIC STYLES ONLY - Base styles come from header.php */
         
-        @font-face {
-            font-family: 'BaticaSans';
-            src: url('https://ydpschool.com/fonts/BaticaSans-Bold.woff2') format('woff2');
-            font-weight: 700;
-            font-style: normal;
-            font-display: swap;
-        }
-        
-        @font-face {
-            font-family: 'BaticaSans';
-            src: url('https://ydpschool.com/fonts/BaticaSans-Medium.woff2') format('woff2');
-            font-weight: 500;
-            font-style: normal;
-            font-display: swap;
-        } 
-
-        /* Enhanced CSS Custom Properties */
-   :root {
-    /* LEVEL 1 (MOST IMPORTANT): BROWN #bd9379 + WHITE */
-    --brown: #bd9379;
-    --white: #ffffff;
-    
-    /* LEVEL 2 (SECONDARY): CREAM #ece8e1 */
-    --cream: #ece8e1;
-    
-    /* LEVEL 3 (SUPPORTING): SAGE #adb89d */
-    --sage: #adb89d;
-    
-    /* LEVEL 4 (ACCENT/CONTRAST - LEAST USED): CURRY #cf723a */
-    --curry: #cf723a;
-    
-    /* Text colors using brown hierarchy */
-    --text-dark: #2c3e50;
-    --text-gray: #7f8c8d;
-    --border-light: #d4c4b8; /* เปลี่ยนจาก #e8e8e8 */
-    
-    /* Status colors */
-    --success: #27ae60;
-    --warning: #f39c12;
-    --error: #e74c3c;
-    --info: #3498db;
-    
-    /* Shadows using brown as base (Level 1) */
-    --shadow-soft: 0 4px 12px rgba(189, 147, 121, 0.15);
-    --shadow-medium: 0 8px 24px rgba(189, 147, 121, 0.25);
-    --radius-sm: 8px;
-    --radius-md: 12px;
-    --radius-lg: 16px;
-    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    --z-navbar: 1000;
-    --z-modal: 2000;
-    --z-toast: 3000;
-}
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'BaticaSans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            line-height: 1.6;
-            color: var(--text-dark);
-            background-color: var(--cream);
-            font-weight: 400;
-            min-height: 100vh;
-        }
-
-        /* Enhanced Navigation */
-.navbar {
-    position: fixed;
-    top: 0; /* หรือ top: 38px; ถ้าเอา promo banner */
-    left: 0;
-    right: 0;
-    background: #ece8e1; /* ใช้สี cream แทน rgba */
-    backdrop-filter: blur(10px);
-    z-index: var(--z-navbar);
-    transition: var(--transition);
-    box-shadow: var(--shadow-soft);
-}
-
-        .nav-container {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 1rem 2rem;
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-
-        .logo {
-            display: flex;
-            align-items: center;
-            gap: 0.8rem;
-            text-decoration: none;
-            color: var(--text-dark);
-        }
-
-        .logo-text {
-            font-size: 1.8rem;
-            font-weight: 700;
-            color: var(--curry);
-        }
-
-        .nav-actions {
-            display: flex;
-            gap: 1rem;
-            align-items: center;
-        }
-
-        /* เพิ่ม CSS นี้ */
-.nav-links {
-    display: flex;
-    list-style: none;
-    gap: 2rem;
-    align-items: center;
-}
-
-.nav-links a {
-    text-decoration: none;
-    color: var(--text-gray);
-    font-weight: 500;
-    font-family: 'BaticaSans', sans-serif;
-    transition: var(--transition);
-}
-
-.nav-links a:hover,
-.nav-links a.active {
-    color: var(--brown);
-}
-
-.profile-link {
-    text-decoration: none;
-    transition: var(--transition);
-}
-
-.profile-icon {
-    width: 45px;
-    height: 45px;
-    background: var(--brown);
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--white);
-    transition: var(--transition);
-    box-shadow: var(--shadow-soft);
-}
-
-.profile-icon:hover {
-    background: #a8855f;
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-medium);
-}
-
-.profile-icon svg {
-    width: 24px;
-    height: 24px;
-}
-
-        .btn {
-            padding: 0.8rem 1.5rem;
-            border: none;
-            border-radius: 50px;
-            font-weight: 600;
-            font-family: inherit;
-            text-decoration: none;
-            cursor: pointer;
-            transition: var(--transition);
-            font-size: 0.95rem;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .btn-primary {
-            background: var(--brown);
-            color: var(--white);
-            box-shadow: var(--shadow-soft);
-        }
-
-        .btn-primary:hover {
-            background: #a8855f;
-            transform: translateY(-2px);
-            box-shadow: var(--shadow-medium);
-        }
-
-       .btn-secondary {
-            background: transparent;
-            color: var(--brown);
-            border: 2px solid var(--brown);
-        }
-
-        .btn-secondary:hover {
-            background: var(--brown);
-            color: var(--white);
-        }
-
         /* Main Content Layout */
         .main-content {
-            margin-top: 100px;
+            padding-top: 2rem;
             min-height: calc(100vh - 100px);
-            padding: 2rem;
+            padding-left: 2rem;
+            padding-right: 2rem;
         }
 
         .container {
@@ -559,8 +356,8 @@ $page_title = "Edit Profile";
         }
 
         .progress-step.active {
-         background: var(--brown);
-    color: var(--white);
+            background: var(--brown);
+            color: var(--white);
         }
 
         .progress-step.completed {
@@ -619,19 +416,19 @@ $page_title = "Edit Profile";
             position: relative;
         }
 
-     .menu-item::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 0;
-    height: 100%;
-    background: var(--brown);
-    border-radius: var(--radius-md);
-    transition: var(--transition);
-    z-index: -1;
-}
+        .menu-item::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 0;
+            height: 100%;
+            background: var(--brown);
+            border-radius: var(--radius-md);
+            transition: var(--transition);
+            z-index: -1;
+        }
 
         .menu-item:hover::before,
         .menu-item.active::before {
@@ -728,9 +525,9 @@ $page_title = "Edit Profile";
         }
 
         .form-input:focus, .form-select:focus, .form-textarea:focus {
-             outline: none;
-    border-color: var(--brown);
-    box-shadow: 0 0 0 3px rgba(189, 147, 121, 0.1);
+            outline: none;
+            border-color: var(--brown);
+            box-shadow: 0 0 0 3px rgba(189, 147, 121, 0.1);
         }
 
         .form-input.error {
@@ -801,7 +598,7 @@ $page_title = "Edit Profile";
 
         .password-toggle:hover {
             color: var(--brown);
-    background: var(--cream);
+            background: var(--cream);
         }
 
         /* Password Strength Indicator */
@@ -864,10 +661,11 @@ $page_title = "Edit Profile";
         }
 
         .checkbox-item.checked {
-   background: var(--brown);
-    color: var(--white);
-    border-color: var(--brown);
-}
+            background: var(--brown);
+            color: var(--white);
+            border-color: var(--brown);
+        }
+
         /* Spice Level Selector */
         .spice-level-selector {
             display: grid;
@@ -896,8 +694,8 @@ $page_title = "Edit Profile";
 
         .spice-option input[type="radio"]:checked + .spice-label {
             background: var(--brown);
-    color: var(--white);
-    border-color: var(--brown);
+            color: var(--white);
+            border-color: var(--brown);
             transform: translateY(-2px);
             box-shadow: var(--shadow-soft);
         }
@@ -1002,7 +800,7 @@ $page_title = "Edit Profile";
             height: 20px;
             margin: -10px 0 0 -10px;
             border: 2px solid transparent;
-    border-top: 2px solid var(--brown);
+            border-top: 2px solid var(--brown);
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
@@ -1082,7 +880,6 @@ $page_title = "Edit Profile";
         }
 
         /* Responsive Design */
-  /* Responsive Design - อัพเดทและเพิ่มเติม */
         @media (max-width: 1024px) {
             .profile-layout {
                 grid-template-columns: 1fr;
@@ -1112,27 +909,10 @@ $page_title = "Edit Profile";
         }
 
         @media (max-width: 768px) {
-            /* Main Content Mobile */
             .main-content {
-                margin-top: 80px;
                 padding: 1rem;
             }
             
-            /* Navigation Mobile */
-            .nav-links {
-                display: none;
-            }
-
-            .nav-container,
-            .navbar > div {
-                padding: 1rem;
-            }
-
-            .nav-actions {
-                gap: 0.5rem;
-            }
-            
-            /* Profile Header Mobile */
             .profile-header {
                 margin-bottom: 2rem;
                 padding: 2rem 1rem;
@@ -1146,19 +926,16 @@ $page_title = "Edit Profile";
                 font-size: 1rem;
             }
             
-            /* Form Grid Mobile */
             .form-grid {
                 grid-template-columns: 1fr;
                 gap: 1rem;
             }
             
-            /* Form Actions Mobile */
             .form-actions {
                 flex-direction: column;
                 gap: 1rem;
             }
             
-            /* Progress Indicator Mobile */
             .progress-indicator {
                 flex-direction: column;
                 gap: 0.5rem;
@@ -1176,14 +953,6 @@ $page_title = "Edit Profile";
                 justify-content: center;
             }
             
-            /* Button Mobile */
-            .btn {
-                padding: 0.8rem 1rem;
-                font-size: 0.95rem;
-                justify-content: center;
-            }
-
-            /* Checkbox Grid Mobile */
             .checkbox-grid {
                 grid-template-columns: 1fr;
                 gap: 0.75rem;
@@ -1193,20 +962,17 @@ $page_title = "Edit Profile";
                 padding: 1rem;
             }
 
-            /* Spice Level Mobile */
             .spice-level-selector {
                 grid-template-columns: repeat(2, 1fr);
                 gap: 1rem;
             }
 
-            /* Form Input Mobile */
             .form-input, .form-select, .form-textarea {
                 font-size: 16px; /* ป้องกัน zoom บน iOS */
             }
         }
 
         @media (max-width: 480px) {
-            /* Profile Header Very Small Mobile */
             .profile-header h1 {
                 font-size: 1.8rem;
             }
@@ -1215,7 +981,6 @@ $page_title = "Edit Profile";
                 font-size: 0.9rem;
             }
 
-            /* Container Very Small Mobile */
             .container {
                 padding: 0;
             }
@@ -1224,13 +989,11 @@ $page_title = "Edit Profile";
                 padding: 0.5rem;
             }
 
-            /* Form Very Small Mobile */
             .checkbox-grid,
             .spice-level-selector {
                 grid-template-columns: 1fr;
             }
 
-            /* Card Padding Very Small Mobile */
             .profile-content .tab-content {
                 padding: 1.5rem 1rem;
             }
@@ -1249,7 +1012,6 @@ $page_title = "Edit Profile";
                 font-size: 0.9rem;
             }
 
-            /* Progress Step Very Small Mobile */
             .progress-step {
                 padding: 0.5rem 0.75rem;
                 min-width: 120px;
@@ -1259,117 +1021,12 @@ $page_title = "Edit Profile";
                 font-size: 0.85rem;
             }
         }
-
-        @media (max-width: 768px) {
-            .main-content {
-                margin-top: 80px;
-                padding: 1rem;
-            }
-            
-            .profile-header {
-                margin-bottom: 2rem;
-                padding: 2rem 1rem;
-            }
-            
-            .profile-header h1 {
-                font-size: 2rem;
-            }
-            
-            .form-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .form-actions {
-                flex-direction: column;
-            }
-            
-            .progress-indicator {
-                flex-direction: column;
-                gap: 0.5rem;
-            }
-            
-            .progress-connector {
-                width: 2px;
-                height: 20px;
-            }
-            
-            .toast {
-                min-width: calc(100vw - 2rem);
-                margin: 0 1rem;
-            }
-            
-            .nav-actions {
-                gap: 0.5rem;
-            }
-            
-            .btn {
-                padding: 0.6rem 1rem;
-                font-size: 0.9rem;
-            }
-        }
-
-        @media (max-width: 480px) {
-            .checkbox-grid,
-            .spice-level-selector {
-                grid-template-columns: 1fr;
-            }
-            
-            .profile-header h1 {
-                font-size: 1.8rem;
-            }
-            
-            .nav-container {
-                padding: 1rem;
-            }
-        }
     </style>
 </head>
 
-<body>
-    <!-- Navigation -->
-  <!-- เปลี่ยนจากนี้ -->
-<nav class="navbar">
-    <div class="nav-container">
-        <a href="home2.php" class="logo">
-            <img src="./assets/image/LOGO_BG.png" alt="Krua Thai" style="height: 40px; width: auto;">
-            <span class="logo-text">Krua Thai</span>
-        </a>
-        
-        <div class="nav-actions">
-            <a href="logout.php" class="btn btn-secondary">Sign Out</a>
-            <a href="dashboard.php" class="btn btn-primary">Dashboard</a>
-        </div>
-    </div>
-</nav>
-
-<!-- เป็นแบบนี้ -->
-<nav class="navbar">
-    <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 2rem; max-width: 1200px; margin: 0 auto; width: 100%;">
-        <a href="home2.php" class="logo">
-            <img src="./assets/image/LOGO_BG2.png" alt="Krua Thai" style="height: 80px; width: auto;">
-        </a>
-        
-        <ul class="nav-links">
-            <li><a href="./menus.php">Menu</a></li>
-            <li><a href="./meal-kits.php">Meal-Kits</a></li>
-            <li><a href="#how-it-works">How It Works</a></li>
-            <li><a href="./about.php">About</a></li>
-            <li><a href="./contact.php">Contact</a></li>
-        </ul>
-        
-        <div class="nav-actions">
-            <a href="dashboard.php" class="profile-link" title="Go to Dashboard">
-                <div class="profile-icon">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                        <circle cx="12" cy="7" r="4"></circle>
-                    </svg>
-                </div>
-            </a>
-            <a href="logout.php" class="btn btn-secondary">Sign Out</a>
-        </div>
-    </div>
-</nav>
+<!-- IMPORTANT: Add has-header class for proper spacing -->
+<body class="has-header">
+    <!-- The header (promo banner + navbar + notifications) is already included from header.php -->
 
     <div class="main-content">
         <!-- Profile Header -->
@@ -1393,7 +1050,7 @@ $page_title = "Edit Profile";
             </div>
             <div class="progress-connector"></div>
             <div class="progress-step" data-step="security">
-                <span class="step-icon">🔒</span>
+                <span class="step-icon">🔐</span>
                 <span>Security</span>
             </div>
         </div>
@@ -1412,7 +1069,7 @@ $page_title = "Edit Profile";
                             <span>Food Preferences</span>
                         </button>
                         <button class="menu-item" data-tab="security">
-                            <span class="menu-icon">🔒</span>
+                            <span class="menu-icon">🔐</span>
                             <span>Security & Privacy</span>
                         </button>
                     </nav>
@@ -1616,8 +1273,8 @@ $page_title = "Edit Profile";
 
                     <!-- Food Preferences Tab -->
                     <div class="tab-content" id="preferences-tab">
-                <form id="preferencesForm">
-    <input type="hidden" name="action" value="update_preferences">
+                        <form id="preferencesForm">
+                            <input type="hidden" name="action" value="update_preferences">
 
                             <div class="section-header">
                                 <h2>Food Preferences</h2>
@@ -1913,450 +1570,444 @@ $page_title = "Edit Profile";
                 document.getElementById(`${targetTab}-tab`).classList.add('active');
                 document.querySelector(`[data-step="${targetTab}"]`).classList.add('active');
                 this.currentTab = targetTab;
-   }
+            }
 
-   setupAutoSave() {
-       const autoSaveFields = document.querySelectorAll('[data-auto-save="true"]');
-       
-       autoSaveFields.forEach(field => {
-           field.addEventListener('input', (e) => {
-               this.handleAutoSave(e.target);
-           });
-       });
-   }
+            setupAutoSave() {
+                const autoSaveFields = document.querySelectorAll('[data-auto-save="true"]');
+                
+                autoSaveFields.forEach(field => {
+                    field.addEventListener('input', (e) => {
+                        this.handleAutoSave(e.target);
+                    });
+                });
+            }
 
-   handleAutoSave(field) {
-       clearTimeout(this.autoSaveTimeout);
-       
-       this.autoSaveTimeout = setTimeout(() => {
-           const formData = new FormData();
-           formData.append('action', 'auto_save');
-           formData.append('field', field.name);
-           formData.append('value', field.value);
+            handleAutoSave(field) {
+                clearTimeout(this.autoSaveTimeout);
+                
+                this.autoSaveTimeout = setTimeout(() => {
+                    const formData = new FormData();
+                    formData.append('action', 'auto_save');
+                    formData.append('field', field.name);
+                    formData.append('value', field.value);
 
-           fetch('edit_profile.php', {
-               method: 'POST',
-               body: formData
-           })
-           .then(response => response.json())
-           .then(data => {
-               if (data.success) {
-                   this.showAutoSaveIndicator(field);
-               }
-           })
-           .catch(console.error);
-       }, 2000); // Auto-save after 2 seconds of inactivity
-   }
+                    fetch('edit_profile.php', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            this.showAutoSaveIndicator(field);
+                        }
+                    })
+                    .catch(console.error);
+                }, 2000); // Auto-save after 2 seconds of inactivity
+            }
 
-   showAutoSaveIndicator(field) {
-       const indicator = field.parentNode.querySelector('.auto-save-indicator');
-       if (indicator) {
-           indicator.classList.add('show');
-           setTimeout(() => {
-               indicator.classList.remove('show');
-           }, 2000);
-       }
-   }
-
-   setupValidation() {
-       const validateFields = document.querySelectorAll('[data-validate]');
-       
-       validateFields.forEach(field => {
-           field.addEventListener('blur', () => this.validateField(field));
-           field.addEventListener('input', () => this.clearFieldError(field));
-       });
-
-       // Special handling for ZIP code delivery check
-       const zipField = document.querySelector('[data-check-delivery="true"]');
-       if (zipField) {
-           zipField.addEventListener('blur', () => this.checkDeliveryZone(zipField));
-       }
-   }
-
-   async validateField(field) {
-       const validationType = field.getAttribute('data-validate');
-       const value = field.value.trim();
-       
-       if (!value) return;
-
-       const formData = new FormData();
-       formData.append('action', 'validate_field');
-       formData.append('field', validationType);
-       formData.append('value', value);
-
-       try {
-           const response = await fetch('edit_profile.php', {
-               method: 'POST',
-               body: formData
-           });
-           const data = await response.json();
-           
-           this.showFieldFeedback(field, data.errors.length > 0 ? data.errors[0] : data.message, data.success ? 'success' : 'error');
-       } catch (error) {
-           console.error('Validation error:', error);
-       }
-   }
-
-   async checkDeliveryZone(field) {
-       const zipCode = field.value.trim();
-       if (!zipCode) return;
-
-       const formData = new FormData();
-       formData.append('action', 'check_delivery_zone');
-       formData.append('zip_code', zipCode);
-
-       try {
-           const response = await fetch('edit_profile.php', {
-               method: 'POST',
-               body: formData
-           });
-           const data = await response.json();
-           
-           const warningDiv = document.getElementById('deliveryZoneWarning');
-           if (data.success) {
-               this.showFieldFeedback(field, data.message, 'success');
-               warningDiv.classList.remove('show');
-           } else {
-               this.showFieldFeedback(field, 'ZIP code checked', 'warning');
-               warningDiv.classList.add('show');
-           }
-       } catch (error) {
-           console.error('Delivery zone check error:', error);
-       }
-   }
-
-   showFieldFeedback(field, message, type) {
-       const feedback = field.parentNode.querySelector('.field-feedback');
-       if (feedback) {
-           feedback.textContent = message;
-           feedback.className = `field-feedback ${type}`;
-       }
-       
-       field.classList.remove('error', 'success');
-       if (type === 'error') {
-           field.classList.add('error');
-       } else if (type === 'success') {
-           field.classList.add('success');
-       }
-   }
-
-   clearFieldError(field) {
-       field.classList.remove('error');
-       const feedback = field.parentNode.querySelector('.field-feedback');
-       if (feedback && feedback.classList.contains('error')) {
-           feedback.textContent = '';
-           feedback.className = 'field-feedback';
-       }
-   }
-
-   setupFormSubmissions() {
-       // Profile form
-       document.getElementById('profileForm').addEventListener('submit', (e) => {
-           this.handleFormSubmit(e, 'Profile updated successfully! 🎉');
-       });
-
-       // Preferences form  
-       document.getElementById('preferencesForm').addEventListener('submit', (e) => {
-           this.handleFormSubmit(e, 'Food preferences saved! 🍽️');
-       });
-
-       // Password form
-       document.getElementById('passwordForm').addEventListener('submit', (e) => {
-           this.handleFormSubmit(e, 'Password changed successfully! 🔒', true);
-       });
-   }
-
-   async handleFormSubmit(e, successMessage, resetForm = false) {
-       e.preventDefault();
-       
-       const form = e.target;
-       const formData = new FormData(form);
-       const submitBtn = form.querySelector('button[type="submit"]');
-       const btnText = submitBtn.querySelector('.btn-text');
-       const btnLoading = submitBtn.querySelector('.btn-loading');
-       
-       // Show loading state
-       this.setButtonLoading(submitBtn, btnText, btnLoading, true);
-       
-       try {
-           const response = await fetch('edit_profile.php', {
-               method: 'POST',
-               body: formData
-           });
-           const data = await response.json();
-           
-           if (data.success) {
-               this.showToast(data.message || successMessage, 'success');
-               if (resetForm) {
-                   form.reset();
-                   this.resetPasswordToggles();
-               }
-               this.clearFormErrors(form);
-           } else {
-               this.handleFormErrors(form, data.errors);
-           }
-       } catch (error) {
-           this.showToast('Network error. Please try again.', 'error');
-           console.error('Form submission error:', error);
-       } finally {
-           this.setButtonLoading(submitBtn, btnText, btnLoading, false);
-       }
-   }
-
-   setButtonLoading(button, textEl, loadingEl, isLoading) {
-       if (isLoading) {
-           button.disabled = true;
-           textEl.style.display = 'none';
-           loadingEl.style.display = 'inline';
-       } else {
-           button.disabled = false;
-           textEl.style.display = 'inline';
-           loadingEl.style.display = 'none';
-       }
-   }
-
-   handleFormErrors(form, errors) {
-       this.clearFormErrors(form);
-       
-       errors.forEach(error => {
-           if (typeof error === 'object' && error.field) {
-               const field = form.querySelector(`[name="${error.field}"]`);
-               if (field) {
-                   this.showFieldFeedback(field, error.message, 'error');
-               }
-           } else {
-               this.showToast(error, 'error');
-           }
-       });
-   }
-
-   clearFormErrors(form) {
-       const fields = form.querySelectorAll('.form-input, .form-select, .form-textarea');
-       fields.forEach(field => {
-           field.classList.remove('error', 'success');
-       });
-       
-       const feedbacks = form.querySelectorAll('.field-feedback');
-       feedbacks.forEach(feedback => {
-           if (feedback.classList.contains('error')) {
-               feedback.textContent = '';
-               feedback.className = 'field-feedback';
-           }
-       });
-   }
-
-   setupPasswordToggle() {
-       window.togglePassword = (fieldId) => {
-           const field = document.getElementById(fieldId);
-           const toggle = field.nextElementSibling;
-           
-           if (field.type === 'password') {
-               field.type = 'text';
-               toggle.textContent = '🙈';
-           } else {
-               field.type = 'password';
-               toggle.textContent = '👁️';
-           }
-       };
-
-       window.resetPasswordForm = () => {
-           document.getElementById('passwordForm').reset();
-           this.resetPasswordToggles();
-           this.updatePasswordStrength('');
-       };
-   }
-
-   resetPasswordToggles() {
-       ['current_password', 'new_password', 'confirm_password'].forEach(id => {
-           const field = document.getElementById(id);
-           if (field) {
-               const toggle = field.nextElementSibling;
-               field.type = 'password';
-               toggle.textContent = '👁️';
-           }
-       });
-   }
-
-   setupPasswordStrength() {
-       const passwordField = document.getElementById('new_password');
-       const confirmField = document.getElementById('confirm_password');
-       
-       if (passwordField) {
-           passwordField.addEventListener('input', (e) => {
-               this.updatePasswordStrength(e.target.value);
-           });
-       }
-
-       if (confirmField) {
-           confirmField.addEventListener('input', (e) => {
-               this.validatePasswordMatch();
-           });
-       }
-   }
-
-   updatePasswordStrength(password) {
-       const strengthBar = document.getElementById('passwordStrengthBar');
-       if (!strengthBar) return;
-
-       let strength = 0;
-       
-       if (password.length >= 8) strength++;
-       if (/[a-z]/.test(password)) strength++;
-       if (/[A-Z]/.test(password)) strength++;
-       if (/\d/.test(password)) strength++;
-       if (/[^a-zA-Z\d]/.test(password)) strength++;
-
-       strengthBar.className = 'password-strength-bar';
-       
-       if (strength <= 2) {
-           strengthBar.classList.add('weak');
-       } else if (strength <= 4) {
-           strengthBar.classList.add('medium');
-       } else {
-           strengthBar.classList.add('strong');
-       }
-   }
-
-   validatePasswordMatch() {
-       const newPassword = document.getElementById('new_password').value;
-       const confirmPassword = document.getElementById('confirm_password').value;
-       const confirmField = document.getElementById('confirm_password');
-       
-       if (confirmPassword && newPassword !== confirmPassword) {
-           this.showFieldFeedback(confirmField, 'Passwords do not match', 'error');
-       } else if (confirmPassword && newPassword === confirmPassword) {
-           this.showFieldFeedback(confirmField, 'Passwords match', 'success');
-       }
-   }
-
-   showToast(message, type = 'success') {
-       const container = document.getElementById('toastContainer');
-       const toast = document.createElement('div');
-       
-       const icons = {
-           success: '✅',
-           error: '❌',
-           warning: '⚠️',
-           info: 'ℹ️'
-       };
-       
-       toast.className = `toast ${type}`;
-       toast.innerHTML = `
-           <span>${icons[type]} ${message}</span>
-           <button class="toast-close" onclick="this.parentElement.remove()">×</button>
-       `;
-       
-       container.appendChild(toast);
-       
-       // Trigger animation
-       setTimeout(() => toast.classList.add('show'), 100);
-       
-       // Auto remove after 5 seconds
-       setTimeout(() => {
-           if (toast.parentElement) {
-               toast.classList.remove('show');
-               setTimeout(() => toast.remove(), 300);
-           }
-       }, 5000);
-   }
-  setupCheckboxStyles() {
-       const checkboxes = document.querySelectorAll('.checkbox-item input[type="checkbox"]');
-       checkboxes.forEach(checkbox => {
-           const updateStyle = () => {
-               const label = checkbox.closest('.checkbox-item');
-               if (checkbox.checked) {
-                   label.classList.add('checked');
-               } else {
-                   label.classList.remove('checked');
-               }
-           };
-           
-           checkbox.addEventListener('change', updateStyle);
-           updateStyle(); // Initial check
-       });
-   }
-
-}
-
-// Initialize the profile manager when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
-   new ProfileManager();
-});
-
-// Phone number formatting
-document.getElementById('phone').addEventListener('input', function(e) {
-   let value = e.target.value.replace(/\D/g, '');
-   if (value.length >= 6) {
-       value = value.replace(/(\d{3})(\d{3})(\d{4})/, '($1) $2-$3');
-   } else if (value.length >= 3) {
-       value = value.replace(/(\d{3})(\d+)/, '($1) $2');
-   }
-   e.target.value = value;
-});
-
-// ZIP code formatting
-document.getElementById('zip_code').addEventListener('input', function(e) {
-   let value = e.target.value.replace(/\D/g, '');
-   if (value.length > 5) {
-       value = value.replace(/(\d{5})(\d{4})/, '$1-$2');
-   }
-   e.target.value = value;
-});
-// 🔥 เพิ่ม Functions ใหม่
-// Navbar scroll behavior
-window.addEventListener('scroll', function() {
-    const navbar = document.querySelector('.navbar');
-    if (window.scrollY > 100) {
-        navbar.style.background = 'rgba(236, 232, 225, 0.98)';
-    } else {
-        navbar.style.background = '#ece8e1';
-    }
-});
-
-// Mobile touch improvements
-document.addEventListener('DOMContentLoaded', function() {
-    // Auto-resize textarea บนมือถือ
-    const textareas = document.querySelectorAll('textarea');
-    textareas.forEach(textarea => {
-        textarea.addEventListener('input', function() {
-            this.style.height = 'auto';
-            this.style.height = this.scrollHeight + 'px';
-        });
-    });
-
-    // Touch gesture สำหรับ tab switching บนมือถือ
-    let touchStartX = 0;
-    let touchEndX = 0;
-    
-    const tabContent = document.querySelector('.profile-content');
-    if (tabContent) {
-        tabContent.addEventListener('touchstart', e => {
-            touchStartX = e.changedTouches[0].screenX;
-        });
-
-        tabContent.addEventListener('touchend', e => {
-            touchEndX = e.changedTouches[0].screenX;
-            handleSwipe();
-        });
-
-        function handleSwipe() {
-            const swipeThreshold = 100;
-            const diff = touchStartX - touchEndX;
-
-            if (Math.abs(diff) > swipeThreshold) {
-                const currentTab = document.querySelector('.menu-item.active');
-                const allTabs = [...document.querySelectorAll('.menu-item')];
-                const currentIndex = allTabs.indexOf(currentTab);
-
-                if (diff > 0 && currentIndex < allTabs.length - 1) {
-                    // Swipe left - next tab
-                    allTabs[currentIndex + 1].click();
-                } else if (diff < 0 && currentIndex > 0) {
-                    // Swipe right - previous tab
-                    allTabs[currentIndex - 1].click();
+            showAutoSaveIndicator(field) {
+                const indicator = field.parentNode.querySelector('.auto-save-indicator');
+                if (indicator) {
+                    indicator.classList.add('show');
+                    setTimeout(() => {
+                        indicator.classList.remove('show');
+                    }, 2000);
                 }
             }
+
+            setupValidation() {
+                const validateFields = document.querySelectorAll('[data-validate]');
+                
+                validateFields.forEach(field => {
+                    field.addEventListener('blur', () => this.validateField(field));
+                    field.addEventListener('input', () => this.clearFieldError(field));
+                });
+
+                // Special handling for ZIP code delivery check
+                const zipField = document.querySelector('[data-check-delivery="true"]');
+                if (zipField) {
+                    zipField.addEventListener('blur', () => this.checkDeliveryZone(zipField));
+                }
+            }
+
+            async validateField(field) {
+                const validationType = field.getAttribute('data-validate');
+                const value = field.value.trim();
+                
+                if (!value) return;
+
+                const formData = new FormData();
+                formData.append('action', 'validate_field');
+                formData.append('field', validationType);
+                formData.append('value', value);
+
+                try {
+                    const response = await fetch('edit_profile.php', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const data = await response.json();
+                    
+                    this.showFieldFeedback(field, data.errors.length > 0 ? data.errors[0] : data.message, data.success ? 'success' : 'error');
+                } catch (error) {
+                    console.error('Validation error:', error);
+                }
+            }
+
+            async checkDeliveryZone(field) {
+                const zipCode = field.value.trim();
+                if (!zipCode) return;
+
+                const formData = new FormData();
+                formData.append('action', 'check_delivery_zone');
+                formData.append('zip_code', zipCode);
+
+                try {
+                    const response = await fetch('edit_profile.php', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const data = await response.json();
+                    
+                    const warningDiv = document.getElementById('deliveryZoneWarning');
+                    if (data.success) {
+                        this.showFieldFeedback(field, data.message, 'success');
+                        warningDiv.classList.remove('show');
+                    } else {
+                        this.showFieldFeedback(field, 'ZIP code checked', 'warning');
+                        warningDiv.classList.add('show');
+                    }
+                } catch (error) {
+                    console.error('Delivery zone check error:', error);
+                }
+            }
+
+            showFieldFeedback(field, message, type) {
+                const feedback = field.parentNode.querySelector('.field-feedback');
+                if (feedback) {
+                    feedback.textContent = message;
+                    feedback.className = `field-feedback ${type}`;
+                }
+                
+                field.classList.remove('error', 'success');
+                if (type === 'error') {
+                    field.classList.add('error');
+                } else if (type === 'success') {
+                    field.classList.add('success');
+                }
+            }
+
+            clearFieldError(field) {
+                field.classList.remove('error');
+                const feedback = field.parentNode.querySelector('.field-feedback');
+                if (feedback && feedback.classList.contains('error')) {
+                    feedback.textContent = '';
+                    feedback.className = 'field-feedback';
+                }
+            }
+
+            setupFormSubmissions() {
+                // Profile form
+                document.getElementById('profileForm').addEventListener('submit', (e) => {
+                    this.handleFormSubmit(e, 'Profile updated successfully! 🎉');
+                });
+
+                // Preferences form  
+                document.getElementById('preferencesForm').addEventListener('submit', (e) => {
+                    this.handleFormSubmit(e, 'Food preferences saved! 🍽️');
+                });
+
+                // Password form
+                document.getElementById('passwordForm').addEventListener('submit', (e) => {
+                    this.handleFormSubmit(e, 'Password changed successfully! 🔐', true);
+                });
+            }
+
+            async handleFormSubmit(e, successMessage, resetForm = false) {
+                e.preventDefault();
+                
+                const form = e.target;
+                const formData = new FormData(form);
+                const submitBtn = form.querySelector('button[type="submit"]');
+                const btnText = submitBtn.querySelector('.btn-text');
+                const btnLoading = submitBtn.querySelector('.btn-loading');
+                
+                // Show loading state
+                this.setButtonLoading(submitBtn, btnText, btnLoading, true);
+                
+                try {
+                    const response = await fetch('edit_profile.php', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        this.showToast(data.message || successMessage, 'success');
+                        if (resetForm) {
+                            form.reset();
+                            this.resetPasswordToggles();
+                        }
+                        this.clearFormErrors(form);
+                    } else {
+                        this.handleFormErrors(form, data.errors);
+                    }
+                } catch (error) {
+                    this.showToast('Network error. Please try again.', 'error');
+                    console.error('Form submission error:', error);
+                } finally {
+                    this.setButtonLoading(submitBtn, btnText, btnLoading, false);
+                }
+            }
+
+            setButtonLoading(button, textEl, loadingEl, isLoading) {
+                if (isLoading) {
+                    button.disabled = true;
+                    textEl.style.display = 'none';
+                    loadingEl.style.display = 'inline';
+                } else {
+                    button.disabled = false;
+                    textEl.style.display = 'inline';
+                    loadingEl.style.display = 'none';
+                }
+            }
+
+            handleFormErrors(form, errors) {
+                this.clearFormErrors(form);
+                
+                errors.forEach(error => {
+                    if (typeof error === 'object' && error.field) {
+                        const field = form.querySelector(`[name="${error.field}"]`);
+                        if (field) {
+                            this.showFieldFeedback(field, error.message, 'error');
+                        }
+                    } else {
+                        this.showToast(error, 'error');
+                    }
+                });
+            }
+
+            clearFormErrors(form) {
+                const fields = form.querySelectorAll('.form-input, .form-select, .form-textarea');
+                fields.forEach(field => {
+                    field.classList.remove('error', 'success');
+                });
+                
+                const feedbacks = form.querySelectorAll('.field-feedback');
+                feedbacks.forEach(feedback => {
+                    if (feedback.classList.contains('error')) {
+                        feedback.textContent = '';
+                        feedback.className = 'field-feedback';
+                    }
+                });
+            }
+
+            setupPasswordToggle() {
+                window.togglePassword = (fieldId) => {
+                    const field = document.getElementById(fieldId);
+                    const toggle = field.nextElementSibling;
+                    
+                    if (field.type === 'password') {
+                        field.type = 'text';
+                        toggle.textContent = '🙈';
+                    } else {
+                        field.type = 'password';
+                        toggle.textContent = '👁️';
+                    }
+                };
+
+                window.resetPasswordForm = () => {
+                    document.getElementById('passwordForm').reset();
+                    this.resetPasswordToggles();
+                    this.updatePasswordStrength('');
+                };
+            }
+
+            resetPasswordToggles() {
+                ['current_password', 'new_password', 'confirm_password'].forEach(id => {
+                    const field = document.getElementById(id);
+                    if (field) {
+                        const toggle = field.nextElementSibling;
+                        field.type = 'password';
+                        toggle.textContent = '👁️';
+                    }
+                });
+            }
+
+            setupPasswordStrength() {
+                const passwordField = document.getElementById('new_password');
+                const confirmField = document.getElementById('confirm_password');
+                
+                if (passwordField) {
+                    passwordField.addEventListener('input', (e) => {
+                        this.updatePasswordStrength(e.target.value);
+                    });
+                }
+
+                if (confirmField) {
+                    confirmField.addEventListener('input', (e) => {
+                        this.validatePasswordMatch();
+                    });
+                }
+            }
+
+            updatePasswordStrength(password) {
+                const strengthBar = document.getElementById('passwordStrengthBar');
+                if (!strengthBar) return;
+
+                let strength = 0;
+                
+                if (password.length >= 8) strength++;
+                if (/[a-z]/.test(password)) strength++;
+                if (/[A-Z]/.test(password)) strength++;
+                if (/\d/.test(password)) strength++;
+                if (/[^a-zA-Z\d]/.test(password)) strength++;
+
+                strengthBar.className = 'password-strength-bar';
+                
+                if (strength <= 2) {
+                    strengthBar.classList.add('weak');
+                } else if (strength <= 4) {
+                    strengthBar.classList.add('medium');
+                } else {
+                    strengthBar.classList.add('strong');
+                }
+            }
+
+            validatePasswordMatch() {
+                const newPassword = document.getElementById('new_password').value;
+                const confirmPassword = document.getElementById('confirm_password').value;
+                const confirmField = document.getElementById('confirm_password');
+                
+                if (confirmPassword && newPassword !== confirmPassword) {
+                    this.showFieldFeedback(confirmField, 'Passwords do not match', 'error');
+                } else if (confirmPassword && newPassword === confirmPassword) {
+                    this.showFieldFeedback(confirmField, 'Passwords match', 'success');
+                }
+            }
+
+            showToast(message, type = 'success') {
+                const container = document.getElementById('toastContainer');
+                const toast = document.createElement('div');
+                
+                const icons = {
+                    success: '✅',
+                    error: '❌',
+                    warning: '⚠️',
+                    info: 'ℹ️'
+                };
+                
+                toast.className = `toast ${type}`;
+                toast.innerHTML = `
+                    <span>${icons[type]} ${message}</span>
+                    <button class="toast-close" onclick="this.parentElement.remove()">×</button>
+                `;
+                
+                container.appendChild(toast);
+                
+                // Trigger animation
+                setTimeout(() => toast.classList.add('show'), 100);
+                
+                // Auto remove after 5 seconds
+                setTimeout(() => {
+                    if (toast.parentElement) {
+                        toast.classList.remove('show');
+                        setTimeout(() => toast.remove(), 300);
+                    }
+                }, 5000);
+            }
+
+            setupCheckboxStyles() {
+                const checkboxes = document.querySelectorAll('.checkbox-item input[type="checkbox"]');
+                checkboxes.forEach(checkbox => {
+                    const updateStyle = () => {
+                        const label = checkbox.closest('.checkbox-item');
+                        if (checkbox.checked) {
+                            label.classList.add('checked');
+                        } else {
+                            label.classList.remove('checked');
+                        }
+                    };
+                    
+                    checkbox.addEventListener('change', updateStyle);
+                    updateStyle(); // Initial check
+                });
+            }
         }
-    }
-});
-</script>
+
+        // Initialize the profile manager when DOM is loaded
+        document.addEventListener('DOMContentLoaded', () => {
+            new ProfileManager();
+        });
+
+        // Phone number formatting
+        document.getElementById('phone').addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, '');
+            if (value.length >= 6) {
+                value = value.replace(/(\d{3})(\d{3})(\d{4})/, '($1) $2-$3');
+            } else if (value.length >= 3) {
+                value = value.replace(/(\d{3})(\d+)/, '($1) $2');
+            }
+            e.target.value = value;
+        });
+
+        // ZIP code formatting
+        document.getElementById('zip_code').addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, '');
+            if (value.length > 5) {
+                value = value.replace(/(\d{5})(\d{4})/, '$1-$2');
+            }
+            e.target.value = value;
+        });
+
+        // Enhanced mobile interactions
+        document.addEventListener('DOMContentLoaded', function() {
+            // Auto-resize textarea
+            const textareas = document.querySelectorAll('textarea');
+            textareas.forEach(textarea => {
+                textarea.addEventListener('input', function() {
+                    this.style.height = 'auto';
+                    this.style.height = this.scrollHeight + 'px';
+                });
+            });
+
+            // Touch gesture for tab switching on mobile
+            let touchStartX = 0;
+            let touchEndX = 0;
+            
+            const tabContent = document.querySelector('.profile-content');
+            if (tabContent) {
+                tabContent.addEventListener('touchstart', e => {
+                    touchStartX = e.changedTouches[0].screenX;
+                });
+
+                tabContent.addEventListener('touchend', e => {
+                    touchEndX = e.changedTouches[0].screenX;
+                    handleSwipe();
+                });
+
+                function handleSwipe() {
+                    const swipeThreshold = 100;
+                    const diff = touchStartX - touchEndX;
+
+                    if (Math.abs(diff) > swipeThreshold) {
+                        const currentTab = document.querySelector('.menu-item.active');
+                        const allTabs = [...document.querySelectorAll('.menu-item')];
+                        const currentIndex = allTabs.indexOf(currentTab);
+
+                        if (diff > 0 && currentIndex < allTabs.length - 1) {
+                            // Swipe left - next tab
+                            allTabs[currentIndex + 1].click();
+                        } else if (diff < 0 && currentIndex > 0) {
+                            // Swipe right - previous tab
+                            allTabs[currentIndex - 1].click();
+                        }
+                    }
+                }
+            }
+        });
+
+        console.log('Somdul Table Edit Profile loaded successfully!');
+    </script>
+</body>
+</html>

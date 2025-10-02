@@ -12,6 +12,11 @@ ini_set('display_errors', 1);
 
 require_once 'config/database.php';
 
+// Load Stripe configuration
+$stripe_config = require_once 'stripe_config.php';
+$environment = $stripe_config['environment'];
+$stripe_publishable_key = $stripe_config[$environment]['publishable_key'];
+
 // Utility Functions
 class GuestProductCheckoutUtils {
     
@@ -223,6 +228,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['place_order'])) {
     if (empty($shipping_zip)) $errors[] = "ZIP code is required";
     if (empty($payment_method)) $errors[] = "Payment method is required";
     
+    // Validate Stripe payment
+    $stripe_payment_intent_id = $_POST['stripe_payment_intent_id'] ?? null;
+
+    if (!$stripe_payment_intent_id && empty($errors)) {
+        $errors[] = "Payment processing failed. Please try again.";
+    }
+
     if (empty($errors)) {
         try {
             $pdo->beginTransaction();
@@ -289,8 +301,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['place_order'])) {
                     id, order_number, user_id, customer_email, customer_name, customer_phone,
                     shipping_address_line1, shipping_city, shipping_state, shipping_zip,
                     subtotal, shipping_cost, tax_amount, total_amount,
-                    status, payment_status, payment_method, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'paid', 'paid', ?, NOW())
+                    status, payment_status, payment_method, stripe_payment_intent_id, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'paid', 'paid', 'credit_card', ?, NOW())
             ");
             
             $full_name = trim($first_name . ' ' . $last_name);
@@ -298,7 +310,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['place_order'])) {
             $stmt->execute([
                 $order_id, $order_number, $user_id, $email, $full_name, $phone,
                 $shipping_address, $shipping_city, $shipping_state, $shipping_zip,
-                $subtotal, $shipping_cost, $tax_amount, $total_amount, $payment_method
+                $subtotal, $shipping_cost, $tax_amount, $total_amount, $stripe_payment_intent_id
             ]);
             
             // Create order items
@@ -390,6 +402,7 @@ include 'header.php';
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Checkout<?= $is_cart_checkout ? ' - Your Cart' : ' - ' . htmlspecialchars($selected_product['name']) ?> | Somdul Table</title>
+    <script src="https://js.stripe.com/v3/"></script>
     <meta name="description" content="Complete your purchase<?= $is_cart_checkout ? ' from your cart' : ' of ' . htmlspecialchars($selected_product['name']) ?>">
     
     <style>
@@ -725,18 +738,15 @@ include 'header.php';
                     </div>
 
                     <!-- Payment Method -->
+                    <!-- Payment with Stripe -->
                     <div class="form-section">
-                        <h2 class="form-section-title">Payment Method</h2>
-                        <div class="form-group">
-                            <label>
-                                <input type="radio" name="payment_method" value="credit_card" checked> Credit Card
-                            </label>
-                        </div>
-                        <div class="form-group">
-                            <label>
-                                <input type="radio" name="payment_method" value="paypal"> PayPal
-                            </label>
-                        </div>
+                        <h2 class="form-section-title">💳 Payment Information</h2>
+                        
+                        <div id="card-element" style="padding: 0.75rem; border: 2px solid var(--border-light); border-radius: var(--radius-sm); background: white; min-height: 40px;"></div>
+                        <div id="card-errors" role="alert" style="color: #e74c3c; margin-top: 0.5rem; font-size: 0.9rem; display: none;"></div>
+                        
+                        <input type="hidden" name="stripe_payment_intent_id" id="stripe_payment_intent_id">
+                        <input type="hidden" name="payment_method" value="credit_card">
                     </div>
 
                     <div class="checkout-buttons">
@@ -810,52 +820,197 @@ include 'header.php';
     </div>
 
     <script>
-        const isCartCheckout = <?= $is_cart_checkout ? 'true' : 'false' ?>;
-        const productPrice = <?= $is_cart_checkout ? $default_subtotal : $selected_product['price'] ?>;
-        
-        function updateQuantity(change) {
-            if (isCartCheckout) return; // Don't allow quantity changes for cart checkout
-            
-            const quantityInput = document.getElementById('quantity');
-            let newQuantity = parseInt(quantityInput.value) + change;
-            
-            if (newQuantity < 1) newQuantity = 1;
-            if (newQuantity > 10) newQuantity = 10;
-            
-            quantityInput.value = newQuantity;
-            updateTotals();
-        }
-        
-        function updateTotals() {
-            if (isCartCheckout) return; // Cart totals are fixed
-            
-            const quantity = parseInt(document.getElementById('quantity').value);
-            const state = document.getElementById('shipping_state').value || 'CA';
-            
-            const subtotal = productPrice * quantity;
-            const shipping = subtotal >= 50 ? 0 : 7.99;
-            
-            const taxRates = { 'CA': 0.0875, 'NY': 0.08, 'TX': 0.0625, 'FL': 0.06 };
-            const taxRate = taxRates[state] || 0.05;
-            const tax = subtotal * taxRate;
-            
-            const total = subtotal + shipping + tax;
-            
-            document.getElementById('subtotal').textContent = '$' + subtotal.toFixed(2);
-            document.getElementById('shipping').textContent = '$' + shipping.toFixed(2);
-            document.getElementById('tax').textContent = '$' + tax.toFixed(2);
-            document.getElementById('total').textContent = '$' + total.toFixed(2);
-            
-            const submitBtn = document.querySelector('.btn-primary');
-            submitBtn.innerHTML = `💳 Place Order - $${total.toFixed(2)}`;
-        }
-        
-        document.addEventListener('DOMContentLoaded', function() {
-            if (!isCartCheckout) {
-                document.getElementById('quantity').addEventListener('change', updateTotals);
+    // Stripe Integration
+<script>
+    // Wait for DOM to be ready
+    document.addEventListener('DOMContentLoaded', function() {
+        // Stripe Integration
+        const stripe = Stripe('<?php echo $stripe_publishable_key; ?>');
+        const elements = stripe.elements();
+
+        const style = {
+            base: {
+                color: '#2c3e50',
+                fontFamily: 'BaticaSans, -apple-system, BlinkMacSystemFont, sans-serif',
+                fontSmoothing: 'antialiased',
+                fontSize: '16px',
+                '::placeholder': {
+                    color: '#adb89d'
+                }
+            },
+            invalid: {
+                color: '#e74c3c',
+                iconColor: '#e74c3c'
             }
-            document.getElementById('shipping_state').addEventListener('change', updateTotals);
+        };
+
+        const cardElement = elements.create('card', {style: style});
+        cardElement.mount('#card-element');
+
+    // Handle real-time validation errors
+    cardElement.on('change', function(event) {
+        const displayError = document.getElementById('card-errors');
+        if (event.error) {
+            displayError.textContent = event.error.message;
+            displayError.style.display = 'block';
+        } else {
+            displayError.textContent = '';
+            displayError.style.display = 'none';
+        }
+    });
+
+    // Original variables
+    const isCartCheckout = <?= $is_cart_checkout ? 'true' : 'false' ?>;
+    const productPrice = <?= $is_cart_checkout ? $default_subtotal : ($selected_product['price'] ?? 0) ?>;
+    
+    // Handle form submission with Stripe
+    const form = document.getElementById('checkoutForm');
+    const submitBtn = form.querySelector('[name="place_order"]');
+    const submitBtnOriginalText = submitBtn.innerHTML;
+
+    async function handleFormSubmission(event) {
+        event.preventDefault();
+        
+        // Basic validation
+        const requiredFields = ['first_name', 'last_name', 'email', 'phone', 'shipping_address', 'shipping_city', 'shipping_state', 'shipping_zip'];
+        let hasErrors = false;
+        
+        requiredFields.forEach(field => {
+            const input = document.querySelector(`[name="${field}"]`);
+            if (input && !input.value.trim()) {
+                input.style.borderColor = '#e74c3c';
+                hasErrors = true;
+            } else if (input) {
+                input.style.borderColor = '#d4c4b8';
+            }
         });
-    </script>
+        
+        if (hasErrors) {
+            alert('Please fill in all required fields.');
+            return;
+        }
+        
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing Payment...';
+        
+        try {
+            const totalAmount = <?= $default_total ?>;
+            
+            // Create payment intent
+            const response = await fetch('ajax/create_product_payment_intent.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    amount: totalAmount,
+                    currency: 'usd',
+                    description: '<?= $is_cart_checkout ? "Cart Checkout" : ($selected_product["name"] ?? "Product Order") ?>'
+                })
+            });
+            
+            const paymentData = await response.json();
+            
+            if (!paymentData.success) {
+                throw new Error(paymentData.message || 'Failed to create payment');
+            }
+            
+            // Confirm payment
+            const result = await stripe.confirmCardPayment(paymentData.payment_intent.client_secret, {
+                payment_method: {
+                    card: cardElement,
+                    billing_details: {
+                        name: document.querySelector('[name="first_name"]').value + ' ' + document.querySelector('[name="last_name"]').value,
+                        email: document.querySelector('[name="email"]').value,
+                        phone: document.querySelector('[name="phone"]').value,
+                        address: {
+                            line1: document.querySelector('[name="shipping_address"]').value,
+                            city: document.querySelector('[name="shipping_city"]').value,
+                            state: document.querySelector('[name="shipping_state"]').value,
+                            postal_code: document.querySelector('[name="shipping_zip"]').value,
+                        }
+                    }
+                }
+            });
+            
+            if (result.error) {
+                throw new Error(result.error.message);
+            } else {
+                const successStatuses = ['succeeded', 'processing', 'requires_capture'];
+                
+                if (successStatuses.includes(result.paymentIntent.status)) {
+                    console.log('Payment successful:', result.paymentIntent.id);
+                    
+                    document.getElementById('stripe_payment_intent_id').value = result.paymentIntent.id;
+                    submitBtn.innerHTML = '<i class="fas fa-check"></i> Payment Successful - Completing Order...';
+                    
+                    // Submit form
+                    form.removeEventListener('submit', handleFormSubmission);
+                    form.submit();
+                    
+                } else {
+                    throw new Error(`Payment status: ${result.paymentIntent.status}`);
+                }
+            }
+            
+        } catch (error) {
+            console.error('Payment error:', error);
+            
+            const cardErrors = document.getElementById('card-errors');
+            cardErrors.textContent = error.message || 'Payment failed. Please try again.';
+            cardErrors.style.display = 'block';
+            
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = submitBtnOriginalText;
+        }
+    }
+
+    form.addEventListener('submit', handleFormSubmission);
+    
+    // Keep original quantity functions for single product checkout
+    function updateQuantity(change) {
+        if (isCartCheckout) return;
+        
+        const quantityInput = document.getElementById('quantity');
+        let newQuantity = parseInt(quantityInput.value) + change;
+        
+        if (newQuantity < 1) newQuantity = 1;
+        if (newQuantity > 10) newQuantity = 10;
+        
+        quantityInput.value = newQuantity;
+        updateTotals();
+    }
+    
+    function updateTotals() {
+        if (isCartCheckout) return;
+        
+        const quantity = parseInt(document.getElementById('quantity').value);
+        const state = document.getElementById('shipping_state').value || 'CA';
+        
+        const subtotal = productPrice * quantity;
+        const shipping = subtotal >= 50 ? 0 : 7.99;
+        
+        const taxRates = { 'CA': 0.0875, 'NY': 0.08, 'TX': 0.0625, 'FL': 0.06 };
+        const taxRate = taxRates[state] || 0.05;
+        const tax = subtotal * taxRate;
+        
+        const total = subtotal + shipping + tax;
+        
+        document.getElementById('subtotal').textContent = '$' + subtotal.toFixed(2);
+        document.getElementById('shipping').textContent = '$' + shipping.toFixed(2);
+        document.getElementById('tax').textContent = '$' + tax.toFixed(2);
+        document.getElementById('total').textContent = '$' + total.toFixed(2);
+        
+        const submitBtn = document.querySelector('.btn-primary');
+        submitBtn.innerHTML = `💳 Place Order - $${total.toFixed(2)}`;
+    }
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        if (!isCartCheckout) {
+            document.getElementById('quantity').addEventListener('change', updateTotals);
+        }
+        document.getElementById('shipping_state').addEventListener('change', updateTotals);
+    });
+</script>
 </body>
 </html>

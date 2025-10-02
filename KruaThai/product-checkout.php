@@ -1,10 +1,8 @@
 <?php
 /**
- * Somdul Table - Product Checkout Page (BINARY COLUMN SAFE)
+ * Somdul Table - Product Checkout Page with Stripe
  * File: product-checkout.php
- * Description: Checkout page for individual product purchases (separate from meal subscriptions)
- * UPDATED: Now redirects to product-order-status.php after successful order
- * FIXED: Handles both collation mismatch and binary column errors
+ * Description: Checkout page for logged-in users purchasing individual products with Stripe payment
  */
 
 session_start();
@@ -12,6 +10,11 @@ error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
 require_once 'config/database.php';
+
+// Load Stripe configuration
+$stripe_config = require_once 'stripe_config.php';
+$environment = $stripe_config['environment'];
+$stripe_publishable_key = $stripe_config[$environment]['publishable_key'];
 
 // Utility Functions
 class ProductCheckoutUtils {
@@ -48,73 +51,27 @@ class ProductCheckoutUtils {
     }
     
     public static function calculateShipping($subtotal, $state = 'CA') {
-        // Simple shipping calculation
-        if ($subtotal >= 50) {
-            return 0.00; // Free shipping over $50
-        }
-        return 7.99; // Standard shipping
+        return $subtotal >= 50 ? 0.00 : 7.99;
     }
     
     public static function calculateTax($subtotal, $state = 'CA') {
-        // Simple tax calculation (CA sales tax)
         $tax_rates = [
-            'CA' => 0.0875, // 8.75%
-            'NY' => 0.08,   // 8%
-            'TX' => 0.0625, // 6.25%
-            'FL' => 0.06,   // 6%
+            'CA' => 0.0875,
+            'NY' => 0.08,
+            'TX' => 0.0625,
+            'FL' => 0.06,
         ];
         
-        $rate = $tax_rates[$state] ?? 0.05; // Default 5%
+        $rate = $tax_rates[$state] ?? 0.05;
         return $subtotal * $rate;
-    }
-}
-
-// Database Connection with Conservative Collation Fix
-function getDatabaseConnection() {
-    try {
-        $database = new Database();
-        $pdo = $database->getConnection();
-        
-        // CONSERVATIVE FIX: Only set connection charset, no forced collation
-        $pdo->exec("SET NAMES utf8mb4");
-        
-        return $pdo;
-        
-    } catch (Exception $e) {
-        // Fallback connections with minimal charset settings
-        $configs = [
-            ["mysql:host=localhost;dbname=somdul_table;charset=utf8mb4", "root", "root"],
-            ["mysql:host=localhost:8889;dbname=somdul_table;charset=utf8mb4", "root", "root"]
-        ];
-        
-        foreach ($configs as $config) {
-            try {
-                $pdo = new PDO($config[0], $config[1], $config[2], [
-                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
-                ]);
-                
-                // Only set charset, avoid forcing collations
-                $pdo->exec("SET NAMES utf8mb4");
-                
-                return $pdo;
-                
-            } catch (PDOException $e) {
-                continue;
-            }
-        }
-        
-        throw new Exception("Database connection failed: " . $e->getMessage());
     }
 }
 
 // Initialize variables
 $selected_product = null;
 $cart_items = [];
-$checkout_action = '';
 $errors = [];
 $success = false;
-$order_id = null;
 $user = null;
 $is_cart_checkout = false;
 
@@ -135,22 +92,44 @@ if (!isset($_SESSION['user_id'])) {
 
 $user_id = $_SESSION['user_id'];
 
-// Handle different entry points - FIXED VERSION
+// Database connection with fallback
+function getDatabaseConnection() {
+    try {
+        $database = new Database();
+        $pdo = $database->getConnection();
+        $pdo->exec("SET NAMES utf8mb4");
+        return $pdo;
+    } catch (Exception $e) {
+        $configs = [
+            ["mysql:host=localhost;dbname=somdul_table;charset=utf8mb4", "root", "root"],
+            ["mysql:host=localhost:8889;dbname=somdul_table;charset=utf8mb4", "root", "root"]
+        ];
+        
+        foreach ($configs as $config) {
+            try {
+                $pdo = new PDO($config[0], $config[1], $config[2], [
+                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
+                ]);
+                $pdo->exec("SET NAMES utf8mb4");
+                return $pdo;
+            } catch (PDOException $e) {
+                continue;
+            }
+        }
+        throw new Exception("Database connection failed: " . $e->getMessage());
+    }
+}
+
+// Handle different entry points
 $source = trim(strtolower($_GET['source'] ?? ''));
 $product_id = trim($_GET['product'] ?? '');
 
-// Check if this is a cart checkout
-$is_cart_checkout = false;
-$cart_items = [];
-
-// More robust cart detection
 if ($source === 'cart' || (isset($_SESSION['cart']) && !empty($_SESSION['cart']) && empty($product_id))) {
-    // Initialize cart if not exists
     if (!isset($_SESSION['cart'])) {
         $_SESSION['cart'] = [];
     }
     
-    // Check if cart has items - redirect to cart page, not product page
     if (empty($_SESSION['cart'])) {
         $_SESSION['flash_message'] = 'Your cart is empty. Please add items before checkout.';
         $_SESSION['flash_type'] = 'error';
@@ -162,20 +141,15 @@ if ($source === 'cart' || (isset($_SESSION['cart']) && !empty($_SESSION['cart'])
     $cart_items = $_SESSION['cart'];
     
 } elseif (!empty($product_id)) {
-    // Direct product purchase
     $is_cart_checkout = false;
     
 } else {
-    // Neither cart nor direct product - unclear intent
-    // Check if there's anything in the cart first
     if (isset($_SESSION['cart']) && !empty($_SESSION['cart'])) {
-        // Has cart items, probably meant to checkout cart
         $_SESSION['flash_message'] = 'Redirected to cart checkout.';
         $_SESSION['flash_type'] = 'info';
         header('Location: product-checkout.php?source=cart');
         exit;
     } else {
-        // No cart items and no product specified - go to products page
         $_SESSION['flash_message'] = 'Please select a product to checkout.';
         $_SESSION['flash_type'] = 'info';
         header('Location: product.php');
@@ -183,14 +157,10 @@ if ($source === 'cart' || (isset($_SESSION['cart']) && !empty($_SESSION['cart'])
     }
 }
 
-// Debug logging (remove in production)
-error_log("Product Checkout Debug - Source: '$source', Product ID: '$product_id', Is Cart: " . ($is_cart_checkout ? 'Yes' : 'No'));
-
 try {
-    // Get database connection with conservative collation fix
     $pdo = getDatabaseConnection();
     
-    // Get user information - NO COLLATE clause to avoid binary column issues
+    // Get user information
     $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
     $stmt->execute([$user_id]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -206,7 +176,6 @@ try {
 
 // Handle single product checkout
 if (!$is_cart_checkout && !empty($product_id)) {
-    // Fetch selected product - NO COLLATE clause to avoid binary column issues
     try {
         $stmt = $pdo->prepare("SELECT * FROM products WHERE id = ? AND is_active = 1");
         $stmt->execute([$product_id]);
@@ -214,7 +183,6 @@ if (!$is_cart_checkout && !empty($product_id)) {
     } catch (Exception $e) {
         error_log("Product fetch error: " . $e->getMessage());
         
-        // Fallback products if database table doesn't exist or has issues
         $fallback_products = [
             'pad-thai-kit-pro' => [
                 'id' => 'pad-thai-kit-pro',
@@ -231,22 +199,6 @@ if (!$is_cart_checkout && !empty($product_id)) {
                 'price' => 12.99,
                 'category' => 'sauce',
                 'stock_quantity' => 100
-            ],
-            'thai-curry-kit-trio' => [
-                'id' => 'thai-curry-kit-trio',
-                'name' => 'Thai Curry Kit Trio',
-                'description' => 'Three authentic curry pastes: Red, Green, and Yellow.',
-                'price' => 34.99,
-                'category' => 'meal-kit',
-                'stock_quantity' => 30
-            ],
-            'fish-sauce-premium' => [
-                'id' => 'fish-sauce-premium',
-                'name' => 'Premium Fish Sauce',
-                'description' => 'Artisanal fish sauce aged for 2 years.',
-                'price' => 18.99,
-                'category' => 'sauce',
-                'stock_quantity' => 75
             ]
         ];
         
@@ -259,22 +211,21 @@ if (!$is_cart_checkout && !empty($product_id)) {
     }
 }
 
-// Handle form submission BEFORE any output
+// Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['place_order']) && empty($errors)) {
     
-    // Validate form input
     $shipping_address = ProductCheckoutUtils::sanitizeInput($_POST['shipping_address'] ?? '');
     $shipping_city = ProductCheckoutUtils::sanitizeInput($_POST['shipping_city'] ?? '');
     $shipping_state = ProductCheckoutUtils::sanitizeInput($_POST['shipping_state'] ?? '');
     $shipping_zip = ProductCheckoutUtils::sanitizeInput($_POST['shipping_zip'] ?? '');
-    $payment_method = ProductCheckoutUtils::sanitizeInput($_POST['payment_method'] ?? '');
+    $stripe_payment_intent_id = $_POST['stripe_payment_intent_id'] ?? null;
     
     // Validation
     if (empty($shipping_address)) $errors[] = "Please enter your shipping address";
     if (empty($shipping_city)) $errors[] = "Please enter your city";
     if (empty($shipping_state)) $errors[] = "Please select your state";
     if (empty($shipping_zip)) $errors[] = "Please enter your ZIP code";
-    if (empty($payment_method)) $errors[] = "Please select a payment method";
+    if (!$stripe_payment_intent_id) $errors[] = "Payment processing failed. Please try again.";
     
     if (empty($errors)) {
         try {
@@ -284,13 +235,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['place_order']) && emp
             $subtotal = 0;
             
             if ($is_cart_checkout) {
-                // Calculate cart totals
                 foreach ($cart_items as $item) {
                     $quantity = intval($item['quantity']);
                     $price = floatval($item['base_price']);
                     $item_total = $price * $quantity;
                     
-                    // Add customization costs
                     if (isset($item['customizations'])) {
                         if (isset($item['customizations']['extra_protein']) && $item['customizations']['extra_protein']) {
                             $item_total += 2.99 * $quantity;
@@ -303,7 +252,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['place_order']) && emp
                     $subtotal += $item_total;
                 }
             } else {
-                // Single product
                 $quantity = max(1, intval($_POST['quantity'] ?? 1));
                 $subtotal = $selected_product['price'] * $quantity;
             }
@@ -316,17 +264,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['place_order']) && emp
             $order_id = ProductCheckoutUtils::generateUUID();
             $order_number = ProductCheckoutUtils::generateOrderNumber();
             
-            // Check if product_orders table exists, if not create a simple order log
+            error_log("Creating order: " . $order_number . " for user: " . $user_id);
+            
+            // Create product order
             try {
-                // Try to insert into product_orders table
                 $stmt = $pdo->prepare("
                     INSERT INTO product_orders (
                         id, order_number, user_id, customer_email, customer_name, customer_phone,
                         shipping_address_line1, shipping_city, shipping_state, shipping_zip,
                         subtotal, shipping_cost, tax_amount, total_amount,
-                        status, payment_status, payment_method,
+                        status, payment_status, payment_method, stripe_payment_intent_id,
                         created_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'paid', 'paid', ?, NOW())
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'paid', 'paid', 'credit_card', ?, NOW())
                 ");
                 
                 $full_name = trim(($user['first_name'] ?? '') . ' ' . ($user['last_name'] ?? ''));
@@ -335,12 +284,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['place_order']) && emp
                 $stmt->execute([
                     $order_id, $order_number, $user_id, $user['email'], $full_name, $user['phone'] ?? '',
                     $shipping_address, $shipping_city, $shipping_state, $shipping_zip,
-                    $subtotal, $shipping_cost, $tax_amount, $total_amount, $payment_method
+                    $subtotal, $shipping_cost, $tax_amount, $total_amount, $stripe_payment_intent_id
                 ]);
                 
                 // Insert order items
                 if ($is_cart_checkout) {
-                    // Insert all cart items
                     foreach ($cart_items as $item) {
                         $item_id = ProductCheckoutUtils::generateUUID();
                         $quantity = intval($item['quantity']);
@@ -359,10 +307,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['place_order']) && emp
                         ]);
                     }
                     
-                    // Clear cart after successful order
                     $_SESSION['cart'] = [];
                 } else {
-                    // Insert single product
                     $item_id = ProductCheckoutUtils::generateUUID();
                     $quantity = max(1, intval($_POST['quantity'] ?? 1));
                     
@@ -379,10 +325,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['place_order']) && emp
                 }
                 
             } catch (Exception $e) {
-                // If product_orders table doesn't exist or has issues, create a basic order log
-                error_log("Product order table error, using fallback: " . $e->getMessage());
+                error_log("Product order table error: " . $e->getMessage());
                 
-                // Create a simple order log in session
                 if (!isset($_SESSION['order_history'])) {
                     $_SESSION['order_history'] = [];
                 }
@@ -396,26 +340,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['place_order']) && emp
                     'status' => 'completed'
                 ];
                 
-                // Still clear cart if cart checkout
                 if ($is_cart_checkout) {
                     $_SESSION['cart'] = [];
                 }
             }
             
-            $pdo->commit();
+            $commit_result = $pdo->commit();
+            error_log("Transaction committed: " . ($commit_result ? 'success' : 'failed'));
             
-            $success = true;
-            $_SESSION['flash_message'] = "Order placed successfully! Order #" . $order_number;
-            $_SESSION['flash_type'] = 'success';
+            $_SESSION['last_order_number'] = $order_number;
+            $_SESSION['last_order_id'] = $order_id;
             
-            // UPDATED: Redirect to product-order-status.php instead of showing success inline
-            header("Location: product-order-status.php?order=" . urlencode($order_id));
-            exit;
+            $redirect_url = "product-order-status.php?order=" . urlencode($order_id);
+            error_log("Redirecting to: " . $redirect_url);
+            
+            header("Location: " . $redirect_url);
+            exit();
             
         } catch (Exception $e) {
-            $pdo->rollBack();
-            $errors[] = "An error occurred while processing your order: " . $e->getMessage();
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
             error_log("Order processing error: " . $e->getMessage());
+            $errors[] = "An error occurred while processing your order: " . $e->getMessage();
         }
     }
 }
@@ -428,7 +375,6 @@ if ($is_cart_checkout) {
         $price = floatval($item['base_price']);
         $item_total = $price * $quantity;
         
-        // Add customization costs
         if (isset($item['customizations'])) {
             if (isset($item['customizations']['extra_protein']) && $item['customizations']['extra_protein']) {
                 $item_total += 2.99 * $quantity;
@@ -449,7 +395,6 @@ $default_shipping = ProductCheckoutUtils::calculateShipping($default_subtotal);
 $default_tax = ProductCheckoutUtils::calculateTax($default_subtotal);
 $default_total = $default_subtotal + $default_shipping + $default_tax;
 
-// Include the header AFTER form processing
 include 'header.php';
 ?>
 
@@ -461,9 +406,10 @@ include 'header.php';
     <title>Checkout<?= $is_cart_checkout ? ' - Your Cart' : ($selected_product ? ' - ' . htmlspecialchars($selected_product['name']) : '') ?> | Somdul Table</title>
     <meta name="description" content="Complete your purchase from Somdul Table">
     
+    <!-- Stripe.js -->
+    <script src="https://js.stripe.com/v3/"></script>
+    
     <style>
-        /* PAGE-SPECIFIC STYLES ONLY - header styles come from header.php */
-        
         .checkout-container {
             max-width: 1200px;
             margin: 2rem auto;
@@ -555,6 +501,26 @@ include 'header.php';
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 1rem;
+        }
+        
+        #card-element {
+            padding: 0.8rem;
+            border: 2px solid var(--border-light);
+            border-radius: var(--radius-sm);
+            background: white;
+            min-height: 44px;
+        }
+        
+        #card-element.StripeElement--focus {
+            border-color: var(--brown);
+            box-shadow: 0 0 0 3px rgba(189, 147, 121, 0.1);
+        }
+        
+        #card-errors {
+            color: #e74c3c;
+            margin-top: 0.5rem;
+            font-size: 0.9rem;
+            display: none;
         }
         
         .order-summary {
@@ -689,7 +655,6 @@ include 'header.php';
             text-decoration: underline;
         }
         
-        /* Mobile responsive */
         @media (max-width: 768px) {
             .checkout-content {
                 grid-template-columns: 1fr;
@@ -717,19 +682,13 @@ include 'header.php';
     </style>
 </head>
 
-<!-- IMPORTANT: Add has-header class for proper spacing -->
 <body class="has-header">
-    <!-- The header (promo banner + navbar) is already included from header.php -->
-
-    <!-- Main Content -->
     <main class="main-content">
         <div class="checkout-container">
-            <!-- Back Link -->
             <a href="<?= $is_cart_checkout ? 'cart.php' : 'product.php' ?>" class="back-link">
                 ← Back to <?= $is_cart_checkout ? 'Cart' : 'Products' ?>
             </a>
 
-            <!-- Checkout Header -->
             <div class="checkout-header">
                 <h1><?= $is_cart_checkout ? 'Checkout - Your Cart' : 'Checkout' ?></h1>
                 <div class="checkout-steps">
@@ -739,7 +698,6 @@ include 'header.php';
                 </div>
             </div>
 
-            <!-- Error Messages -->
             <?php if (!empty($errors)): ?>
                 <div class="error-message">
                     <strong>Please resolve the following issues:</strong>
@@ -751,14 +709,11 @@ include 'header.php';
                 </div>
             <?php endif; ?>
 
-            <!-- Checkout Content -->
             <div class="checkout-content">
-                <!-- Checkout Form -->
                 <div class="checkout-form">
                     <form method="POST" id="checkoutForm">
-                        <!-- Shipping Information -->
                         <div class="form-section">
-                            <h3>📦 Shipping Information</h3>
+                            <h3>Shipping Information</h3>
                             
                             <div class="form-group">
                                 <label for="shipping_address">Street Address *</label>
@@ -792,37 +747,26 @@ include 'header.php';
                             </div>
                         </div>
 
-                        <!-- Payment Method -->
                         <div class="form-section">
-                            <h3>💳 Payment Method</h3>
-                            
-                            <div class="form-group">
-                                <label>
-                                    <input type="radio" name="payment_method" value="credit_card" checked>
-                                    Credit/Debit Card
-                                </label>
-                            </div>
-                            
-                            <div class="form-group">
-                                <label>
-                                    <input type="radio" name="payment_method" value="paypal">
-                                    PayPal
-                                </label>
-                            </div>
+                            <h3>Payment Information</h3>
+                            <div id="card-element"></div>
+                            <div id="card-errors" role="alert"></div>
                         </div>
 
-                        <button type="submit" name="place_order" class="btn btn-primary" style="width: 100%; padding: 1rem;">
-                            Place Order - <?= ProductCheckoutUtils::formatPrice($default_total) ?>
+                        <input type="hidden" name="stripe_payment_intent_id" id="stripe_payment_intent_id">
+                        <input type="hidden" name="quantity" id="quantity_hidden" value="1">
+                        <input type="hidden" name="place_order" id="place_order_hidden" value="1">
+
+                        <button type="submit" name="place_order_btn" class="btn btn-primary" id="submit-btn" style="width: 100%; padding: 1rem;">
+                            <span id="submit-text">Place Order - <?= ProductCheckoutUtils::formatPrice($default_total) ?></span>
                         </button>
                     </form>
                 </div>
 
-                <!-- Order Summary -->
                 <div class="order-summary">
                     <h3 style="color: var(--brown); margin-bottom: 1rem;">Order Summary</h3>
                     
                     <?php if ($is_cart_checkout): ?>
-                        <!-- Display all cart items -->
                         <?php foreach ($cart_items as $item): ?>
                             <div class="product-item">
                                 <div class="product-image">🍜</div>
@@ -834,7 +778,6 @@ include 'header.php';
                             </div>
                         <?php endforeach; ?>
                     <?php elseif (isset($selected_product)): ?>
-                        <!-- Single product -->
                         <div class="product-item">
                             <div class="product-image">🍜</div>
                             <div class="product-details">
@@ -843,18 +786,9 @@ include 'header.php';
                                 
                                 <div class="quantity-selector">
                                     <button type="button" class="quantity-btn" onclick="updateQuantity(-1)">-</button>
-                                    <input type="number" class="quantity-input" id="quantity" name="quantity" value="1" min="1" max="10">
+                                    <input type="number" class="quantity-input" id="quantity" value="1" min="1" max="10">
                                     <button type="button" class="quantity-btn" onclick="updateQuantity(1)">+</button>
                                 </div>
-                            </div>
-                        </div>
-                    <?php else: ?>
-                        <!-- Fallback for no product -->
-                        <div class="product-item">
-                            <div class="product-image">🍜</div>
-                            <div class="product-details">
-                                <div class="product-name">Product Checkout</div>
-                                <div class="product-price">Processing...</div>
                             </div>
                         </div>
                     <?php endif; ?>
@@ -879,8 +813,8 @@ include 'header.php';
                     </div>
                     
                     <div style="font-size: 0.9rem; color: var(--text-gray); margin-top: 1rem;">
-                        🚚 Free shipping on orders over $50<br>
-                        📞 Questions? <a href="contact.php" style="color: var(--brown);">Contact us</a>
+                        Free shipping on orders over $50<br>
+                        Questions? <a href="contact.php" style="color: var(--brown);">Contact us</a>
                     </div>
                 </div>
             </div>
@@ -888,106 +822,174 @@ include 'header.php';
     </main>
 
     <script>
-        const isCartCheckout = <?= $is_cart_checkout ? 'true' : 'false' ?>;
-        const productPrice = <?= isset($selected_product) ? $selected_product['price'] : ($is_cart_checkout ? $default_subtotal : 0) ?>;
-        
-        // Update quantity and recalculate totals (only for single product)
-        function updateQuantity(change) {
-            if (isCartCheckout) return; // Don't allow quantity changes for cart checkout
-            
-            const quantityInput = document.getElementById('quantity');
-            if (!quantityInput) return;
-            
-            let newQuantity = parseInt(quantityInput.value) + change;
-            
-            if (newQuantity < 1) newQuantity = 1;
-            if (newQuantity > 10) newQuantity = 10;
-            
-            quantityInput.value = newQuantity;
-            updateTotals();
-        }
-        
-        // Recalculate order totals
-        function updateTotals() {
-            if (isCartCheckout) return; // Cart totals are fixed
-            
-            const quantityInput = document.getElementById('quantity');
-            if (!quantityInput) return;
-            
-            const quantity = parseInt(quantityInput.value);
-            const state = document.getElementById('shipping_state').value || 'CA';
-            
-            const subtotal = productPrice * quantity;
-            const shipping = subtotal >= 50 ? 0 : 7.99;
-            
-            // Simple tax calculation
-            const taxRates = { 'CA': 0.0875, 'NY': 0.08, 'TX': 0.0625, 'FL': 0.06 };
-            const taxRate = taxRates[state] || 0.05;
-            const tax = subtotal * taxRate;
-            
-            const total = subtotal + shipping + tax;
-            
-            // Update display
-            document.getElementById('subtotal').textContent = formatPrice(subtotal);
-            document.getElementById('shipping').textContent = formatPrice(shipping);
-            document.getElementById('tax').textContent = formatPrice(tax);
-            document.getElementById('total').textContent = formatPrice(total);
-            
-            // Update button text
-            const submitBtn = document.querySelector('[name="place_order"]');
-            if (submitBtn) {
-                submitBtn.textContent = `Place Order - ${formatPrice(total)}`;
-            }
-        }
-        
-        // Format price helper
-        function formatPrice(amount) {
-            return '$' + amount.toFixed(2);
-        }
-        
-        // Event listeners
         document.addEventListener('DOMContentLoaded', function() {
-            if (!isCartCheckout) {
-                // Quantity input change
-                const quantityInput = document.getElementById('quantity');
-                if (quantityInput) {
-                    quantityInput.addEventListener('change', updateTotals);
-                }
-            }
+            const isCartCheckout = <?= $is_cart_checkout ? 'true' : 'false' ?>;
+            const productPrice = <?= isset($selected_product) ? $selected_product['price'] : ($is_cart_checkout ? $default_subtotal : 0) ?>;
             
-            // State change updates tax
-            const stateSelect = document.getElementById('shipping_state');
-            if (stateSelect) {
-                stateSelect.addEventListener('change', function() {
-                    if (!isCartCheckout) {
-                        updateTotals();
+            // Initialize Stripe
+            const stripe = Stripe('<?php echo $stripe_publishable_key; ?>');
+            const elements = stripe.elements();
+            
+            const style = {
+                base: {
+                    color: '#2c3e50',
+                    fontFamily: 'BaticaSans, -apple-system, BlinkMacSystemFont, sans-serif',
+                    fontSmoothing: 'antialiased',
+                    fontSize: '16px',
+                    '::placeholder': {
+                        color: '#adb89d'
+                    }
+                },
+                invalid: {
+                    color: '#e74c3c',
+                    iconColor: '#e74c3c'
+                }
+            };
+            
+            const cardElement = elements.create('card', {style: style});
+            cardElement.mount('#card-element');
+            
+            cardElement.on('change', function(event) {
+                const displayError = document.getElementById('card-errors');
+                if (event.error) {
+                    displayError.textContent = event.error.message;
+                    displayError.style.display = 'block';
+                } else {
+                    displayError.textContent = '';
+                    displayError.style.display = 'none';
+                }
+            });
+            
+            // Form submission
+            const form = document.getElementById('checkoutForm');
+            const submitBtn = document.getElementById('submit-btn');
+            const submitText = document.getElementById('submit-text');
+            
+            form.addEventListener('submit', async function(event) {
+                event.preventDefault();
+                
+                const requiredFields = ['shipping_address', 'shipping_city', 'shipping_state', 'shipping_zip'];
+                let hasErrors = false;
+                
+                requiredFields.forEach(field => {
+                    const input = document.getElementById(field);
+                    if (input && !input.value.trim()) {
+                        input.style.borderColor = '#dc3545';
+                        hasErrors = true;
+                    } else if (input) {
+                        input.style.borderColor = '#d4c4b8';
                     }
                 });
-            }
-            
-            // Form validation
-            const checkoutForm = document.getElementById('checkoutForm');
-            if (checkoutForm) {
-                checkoutForm.addEventListener('submit', function(e) {
-                    const requiredFields = ['shipping_address', 'shipping_city', 'shipping_state', 'shipping_zip'];
-                    let hasErrors = false;
+                
+                if (hasErrors) {
+                    alert('Please fill in all required fields.');
+                    return;
+                }
+                
+                submitBtn.disabled = true;
+                submitText.innerHTML = 'Processing Payment...';
+                
+                try {
+                    const totalAmount = parseFloat(document.getElementById('total').textContent.replace('$', ''));
                     
-                    requiredFields.forEach(field => {
-                        const input = document.getElementById(field);
-                        if (input && !input.value.trim()) {
-                            input.style.borderColor = '#dc3545';
-                            hasErrors = true;
-                        } else if (input) {
-                            input.style.borderColor = '#d4c4b8';
+                    const response = await fetch('ajax/create_product_payment_intent.php', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            amount: totalAmount,
+                            currency: 'usd',
+                            description: '<?= $is_cart_checkout ? "Cart Checkout" : ($selected_product["name"] ?? "Product Order") ?>'
+                        })
+                    });
+                    
+                    const paymentData = await response.json();
+                    
+                    if (!paymentData.success) {
+                        throw new Error(paymentData.message || 'Failed to create payment');
+                    }
+                    
+                    const result = await stripe.confirmCardPayment(paymentData.payment_intent.client_secret, {
+                        payment_method: {
+                            card: cardElement,
+                            billing_details: {
+                                address: {
+                                    line1: document.getElementById('shipping_address').value,
+                                    city: document.getElementById('shipping_city').value,
+                                    state: document.getElementById('shipping_state').value,
+                                    postal_code: document.getElementById('shipping_zip').value,
+                                }
+                            }
                         }
                     });
                     
-                    if (hasErrors) {
-                        e.preventDefault();
-                        alert('Please fill in all required fields.');
+                    if (result.error) {
+                        throw new Error(result.error.message);
+                    } else {
+                        const successStatuses = ['succeeded', 'processing', 'requires_capture'];
+                        
+                        if (successStatuses.includes(result.paymentIntent.status)) {
+                            document.getElementById('stripe_payment_intent_id').value = result.paymentIntent.id;
+                            submitText.innerHTML = 'Payment Successful - Completing Order...';
+                            form.submit();
+                        } else {
+                            throw new Error('Payment status: ' + result.paymentIntent.status);
+                        }
                     }
-                });
+                    
+                } catch (error) {
+                    console.error('Payment error:', error);
+                    const cardErrors = document.getElementById('card-errors');
+                    cardErrors.textContent = error.message || 'Payment failed. Please try again.';
+                    cardErrors.style.display = 'block';
+                    submitBtn.disabled = false;
+                    submitText.innerHTML = 'Place Order - <?= ProductCheckoutUtils::formatPrice($default_total) ?>';
+                }
+            });
+            
+            // Quantity updates
+            window.updateQuantity = function(change) {
+                if (isCartCheckout) return;
+                
+                const quantityInput = document.getElementById('quantity');
+                let newQuantity = parseInt(quantityInput.value) + change;
+                
+                if (newQuantity < 1) newQuantity = 1;
+                if (newQuantity > 10) newQuantity = 10;
+                
+                quantityInput.value = newQuantity;
+                document.getElementById('quantity_hidden').value = newQuantity;
+                updateTotals();
+            };
+            
+            function updateTotals() {
+                if (isCartCheckout) return;
+                
+                const quantity = parseInt(document.getElementById('quantity').value);
+                const state = document.getElementById('shipping_state').value || 'CA';
+                
+                const subtotal = productPrice * quantity;
+                const shipping = subtotal >= 50 ? 0 : 7.99;
+                
+                const taxRates = { 'CA': 0.0875, 'NY': 0.08, 'TX': 0.0625, 'FL': 0.06 };
+                const taxRate = taxRates[state] || 0.05;
+                const tax = subtotal * taxRate;
+                
+                const total = subtotal + shipping + tax;
+                
+                document.getElementById('subtotal').textContent = '$' + subtotal.toFixed(2);
+                document.getElementById('shipping').textContent = '$' + shipping.toFixed(2);
+                document.getElementById('tax').textContent = '$' + tax.toFixed(2);
+                document.getElementById('total').textContent = '$' + total.toFixed(2);
+                
+                submitText.innerHTML = 'Place Order - $' + total.toFixed(2);
             }
+            
+            if (!isCartCheckout) {
+                document.getElementById('quantity').addEventListener('change', updateTotals);
+            }
+            document.getElementById('shipping_state').addEventListener('change', updateTotals);
         });
     </script>
 </body>

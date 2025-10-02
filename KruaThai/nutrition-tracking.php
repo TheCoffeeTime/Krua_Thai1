@@ -1,15 +1,15 @@
 <?php
 /**
- * Krua Thai - Nutrition Tracking Page (Production Version)
+ * Somdul Table - Nutrition Tracking Page (Redesigned)
  * File: nutrition-tracking.php
- * Description: Two-level nutrition display with historical view
- * Language: English (USA market)
- * Mobile-optimized and production-ready
+ * Description: Comprehensive nutrition tracking with daily, weekly, and monthly views
+ * UPDATED: Now uses header.php for consistent navigation and styling
+ * Features: Healthy, balanced nutrition tracking that promotes wellbeing
  */
 
 session_start();
-error_reporting(0); // Disable in production
-ini_set('display_errors', 0); // Disable in production
+error_reporting(0);
+ini_set('display_errors', 0);
 
 require_once 'config/database.php';
 require_once 'includes/functions.php';
@@ -20,16 +20,20 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
+// Include the header (contains navbar, promo banner, fonts, and base styles)
+include 'header.php';
+
 $user_id = $_SESSION['user_id'];
 $today = date('Y-m-d');
 
 // ===== NUTRITION FUNCTIONS =====
 function getNutritionTargets($goal_type = 'maintenance') {
+    // Balanced, health-focused nutrition targets
     $targets = [
-        'weight_loss' => ['calories' => 1600, 'protein' => 120, 'carbs' => 150, 'fat' => 55],
-        'maintenance' => ['calories' => 2000, 'protein' => 150, 'carbs' => 250, 'fat' => 65],
-        'muscle_gain' => ['calories' => 2400, 'protein' => 180, 'carbs' => 300, 'fat' => 80],
-        'healthy_thai' => ['calories' => 1800, 'protein' => 135, 'carbs' => 225, 'fat' => 60]
+        'weight_loss' => ['calories' => 1600, 'protein' => 120, 'carbs' => 150, 'fat' => 55, 'description' => 'Balanced approach for gradual, healthy weight management'],
+        'maintenance' => ['calories' => 2000, 'protein' => 150, 'carbs' => 250, 'fat' => 65, 'description' => 'Well-rounded nutrition for maintaining current health'],
+        'muscle_gain' => ['calories' => 2400, 'protein' => 180, 'carbs' => 300, 'fat' => 80, 'description' => 'Protein-rich meals supporting muscle development'],
+        'healthy_thai' => ['calories' => 1800, 'protein' => 135, 'carbs' => 225, 'fat' => 60, 'description' => 'Traditional Thai nutrition with modern health insights']
     ];
     
     return $targets[$goal_type] ?? $targets['maintenance'];
@@ -74,12 +78,11 @@ function syncLatestOrdersToNutrition($pdo, $user_id) {
     }
 }
 
-// ===== DAILY NUTRITION CALCULATION =====
 function calculateDailyNutritionFromSubscription($pdo, $user_id, $date) {
     try {
         $stmt = $pdo->prepare("
             SELECT m.id, m.name_thai, m.name, m.calories_per_serving, m.protein_g, m.carbs_g, m.fat_g, 
-                   m.fiber_g, m.sodium_mg, sm.quantity, m.main_image_url
+                   m.fiber_g, m.sodium_mg, sm.quantity, m.main_image_url, m.category
             FROM subscription_menus sm
             JOIN menus m ON sm.menu_id = m.id
             JOIN subscriptions s ON sm.subscription_id = s.id
@@ -95,7 +98,6 @@ function calculateDailyNutritionFromSubscription($pdo, $user_id, $date) {
         ];
         
         foreach ($meals as $meal) {
-            // Use existing nutrition data from database
             $qty = intval($meal['quantity']) ?: 1;
             $totals['calories'] += (floatval($meal['calories_per_serving']) ?: 0) * $qty;
             $totals['protein'] += (floatval($meal['protein_g']) ?: 0) * $qty;
@@ -106,7 +108,7 @@ function calculateDailyNutritionFromSubscription($pdo, $user_id, $date) {
             $totals['meals'][] = $meal;
         }
         
-        // Calculate percentages
+        // Calculate percentages with health-focused messaging
         $goal_type = $_SESSION['nutrition_goal'] ?? 'maintenance';
         $targets = getNutritionTargets($goal_type);
 
@@ -137,101 +139,138 @@ function getNutritionMessage($totals) {
     $meals = $totals['meals_count'];
     
     if ($meals == 0) {
-        return "No meals scheduled for this day.";
+        return "No meals scheduled for this day. Consider adding some delicious Thai meals to your plan!";
     }
     
-    if ($calories < 1200) {
-        return "Calories are below recommended minimum. Consider adding more meals.";
-    } elseif ($calories > 2500) {
-        return "High calorie intake for the day. Monitor portion sizes.";
-    } elseif ($protein < 100) {
-        return "Protein intake is low. Consider adding protein-rich meals.";
-    } elseif ($calories >= 1800 && $calories <= 2200 && $protein >= 120) {
-        return "Excellent nutritional balance for the day!";
+    // Health-focused, positive messaging
+    if ($calories >= 1200 && $calories <= 2800 && $protein >= 50) {
+        if ($calories >= 1600 && $calories <= 2200 && $protein >= 100) {
+            return "Excellent nutritional balance! Your Thai meals provide great variety and nutrients.";
+        } else {
+            return "Good nutrition from your Thai meal selection. You're nourishing your body well!";
+        }
+    } elseif ($calories < 1200) {
+        return "Consider adding more meals to ensure you're getting adequate nutrition throughout the day.";
+    } elseif ($protein < 50) {
+        return "Your meals look delicious! Consider adding some protein-rich Thai dishes for balanced nutrition.";
     } else {
-        return "Good nutrition from your Thai meal selection.";
+        return "Your Thai meal plan provides good nutrition. Keep enjoying these flavorful, healthy choices!";
     }
 }
 
 function getNutritionColor($percent) {
-    if ($percent < 50) return '#e74c3c'; // Red - low
-    if ($percent < 80) return '#f39c12'; // Orange - medium
-    if ($percent <= 110) return '#27ae60'; // Green - good
-    return '#e67e22'; // Orange - high
+    if ($percent < 50) return '#f39c12'; // Orange - room for more
+    if ($percent < 80) return '#3498db'; // Blue - on track
+    if ($percent <= 110) return '#27ae60'; // Green - excellent
+    return '#2c3e50'; // Dark - adequate
 }
 
-// ===== TWO-LEVEL DISPLAY FUNCTIONS =====
-function getNutritionHistory($pdo, $user_id, $days_back = 7) {
-    $history = [];
-    for ($i = 0; $i < $days_back; $i++) {
-        $date = date('Y-m-d', strtotime("-$i days"));
-        $daily = calculateDailyNutritionFromSubscription($pdo, $user_id, $date);
-        $history[$date] = $daily;
-    }
-    return array_reverse($history, true);
-}
-
-function getWeeklyPackageOverview($pdo, $user_id, $week_start) {
+function getWeeklyNutritionSummary($pdo, $user_id, $week_start) {
     try {
-        $stmt = $pdo->prepare("
-            SELECT 
-                COUNT(*) as total_meals,
-                SUM(m.calories_per_serving * sm.quantity) as total_calories,
-                SUM(m.protein_g * sm.quantity) as total_protein,
-                SUM(m.carbs_g * sm.quantity) as total_carbs,
-                SUM(m.fat_g * sm.quantity) as total_fat,
-                sp.name as plan_name,
-                sp.meals_per_week
-            FROM subscription_menus sm
-            JOIN menus m ON sm.menu_id = m.id
-            JOIN subscriptions s ON sm.subscription_id = s.id
-            JOIN subscription_plans sp ON s.plan_id = sp.id
-            WHERE s.user_id = ? 
-            AND sm.delivery_date BETWEEN ? AND DATE_ADD(?, INTERVAL 6 DAY)
-            AND s.status IN ('active', 'paused')
-            GROUP BY sp.name, sp.meals_per_week
-        ");
-        $stmt->execute([$user_id, $week_start, $week_start]);
-        $package = $stmt->fetch(PDO::FETCH_ASSOC);
+        $week_end = date('Y-m-d', strtotime($week_start . ' +6 days'));
+        $weekly_data = [];
         
-        if (!$package) {
-            return null;
+        for ($i = 0; $i < 7; $i++) {
+            $date = date('Y-m-d', strtotime($week_start . " +$i days"));
+            $daily = calculateDailyNutritionFromSubscription($pdo, $user_id, $date);
+            $weekly_data[$date] = $daily;
+        }
+        
+        // Calculate weekly totals and averages
+        $week_totals = ['calories' => 0, 'protein' => 0, 'carbs' => 0, 'fat' => 0, 'fiber' => 0, 'meals' => 0];
+        
+        foreach ($weekly_data as $daily) {
+            $week_totals['calories'] += $daily['calories'];
+            $week_totals['protein'] += $daily['protein'];
+            $week_totals['carbs'] += $daily['carbs'];
+            $week_totals['fat'] += $daily['fat'];
+            $week_totals['fiber'] += $daily['fiber'];
+            $week_totals['meals'] += $daily['meals_count'];
         }
         
         return [
-            'plan_name' => $package['plan_name'] ?? 'Your Plan',
-            'meals_per_week' => intval($package['meals_per_week']) ?: 0,
-            'total_meals' => intval($package['total_meals']) ?: 0,
-            'total_calories' => floatval($package['total_calories']) ?: 0,
-            'total_protein' => floatval($package['total_protein']) ?: 0,
-            'total_carbs' => floatval($package['total_carbs']) ?: 0,
-            'total_fat' => floatval($package['total_fat']) ?: 0,
-            'avg_calories_per_day' => round((floatval($package['total_calories']) ?: 0) / 7),
-            'avg_protein_per_day' => round((floatval($package['total_protein']) ?: 0) / 7, 1),
             'week_start' => $week_start,
-            'week_end' => date('Y-m-d', strtotime($week_start . ' +6 days'))
+            'week_end' => $week_end,
+            'daily_data' => $weekly_data,
+            'totals' => $week_totals,
+            'averages' => [
+                'calories' => round($week_totals['calories'] / 7),
+                'protein' => round($week_totals['protein'] / 7, 1),
+                'carbs' => round($week_totals['carbs'] / 7, 1),
+                'fat' => round($week_totals['fat'] / 7, 1),
+                'fiber' => round($week_totals['fiber'] / 7, 1),
+                'meals' => round($week_totals['meals'] / 7, 1)
+            ]
         ];
     } catch (Exception $e) {
-        error_log("Weekly package error: " . $e->getMessage());
+        error_log("Weekly summary error: " . $e->getMessage());
         return null;
     }
 }
 
-function getTodayGoalBreakdown($daily_nutrition, $goal_type = 'maintenance') {
-    $targets = getNutritionTargets($goal_type);
-    
-    return [
-        'target_calories' => $targets['calories'],
-        'target_protein' => $targets['protein'],
-        'target_carbs' => $targets['carbs'],
-        'target_fat' => $targets['fat'],
-        'available_calories' => $daily_nutrition['calories'],
-        'available_protein' => $daily_nutrition['protein'],
-        'coverage_percent' => $targets['calories'] > 0 ? round(($daily_nutrition['calories'] / $targets['calories']) * 100) : 0,
-        'remaining_calories' => max(0, $targets['calories'] - $daily_nutrition['calories']),
-        'remaining_protein' => max(0, $targets['protein'] - $daily_nutrition['protein']),
-        'goal_type' => $goal_type
-    ];
+function getMonthlyNutritionSummary($pdo, $user_id, $month_start) {
+    try {
+        $month_end = date('Y-m-t', strtotime($month_start));
+        $days_in_month = date('t', strtotime($month_start));
+        
+        $stmt = $pdo->prepare("
+            SELECT 
+                DATE(sm.delivery_date) as date,
+                SUM(m.calories_per_serving * sm.quantity) as daily_calories,
+                SUM(m.protein_g * sm.quantity) as daily_protein,
+                SUM(m.carbs_g * sm.quantity) as daily_carbs,
+                SUM(m.fat_g * sm.quantity) as daily_fat,
+                SUM(m.fiber_g * sm.quantity) as daily_fiber,
+                COUNT(*) as daily_meals
+            FROM subscription_menus sm
+            JOIN menus m ON sm.menu_id = m.id
+            JOIN subscriptions s ON sm.subscription_id = s.id
+            WHERE s.user_id = ? 
+            AND sm.delivery_date BETWEEN ? AND ?
+            AND s.status IN ('active', 'paused')
+            GROUP BY DATE(sm.delivery_date)
+            ORDER BY DATE(sm.delivery_date)
+        ");
+        
+        $stmt->execute([$user_id, $month_start, $month_end]);
+        $monthly_data = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Process data
+        $month_totals = ['calories' => 0, 'protein' => 0, 'carbs' => 0, 'fat' => 0, 'fiber' => 0, 'meals' => 0];
+        $active_days = 0;
+        
+        foreach ($monthly_data as $day) {
+            if ($day['daily_calories'] > 0) {
+                $active_days++;
+                $month_totals['calories'] += $day['daily_calories'];
+                $month_totals['protein'] += $day['daily_protein'];
+                $month_totals['carbs'] += $day['daily_carbs'];
+                $month_totals['fat'] += $day['daily_fat'];
+                $month_totals['fiber'] += $day['daily_fiber'];
+                $month_totals['meals'] += $day['daily_meals'];
+            }
+        }
+        
+        return [
+            'month_start' => $month_start,
+            'month_end' => $month_end,
+            'days_in_month' => $days_in_month,
+            'active_days' => $active_days,
+            'daily_data' => $monthly_data,
+            'totals' => $month_totals,
+            'averages' => $active_days > 0 ? [
+                'calories' => round($month_totals['calories'] / $active_days),
+                'protein' => round($month_totals['protein'] / $active_days, 1),
+                'carbs' => round($month_totals['carbs'] / $active_days, 1),
+                'fat' => round($month_totals['fat'] / $active_days, 1),
+                'fiber' => round($month_totals['fiber'] / $active_days, 1),
+                'meals' => round($month_totals['meals'] / $active_days, 1)
+            ] : ['calories' => 0, 'protein' => 0, 'carbs' => 0, 'fat' => 0, 'fiber' => 0, 'meals' => 0]
+        ];
+    } catch (Exception $e) {
+        error_log("Monthly summary error: " . $e->getMessage());
+        return null;
+    }
 }
 
 // ===== AJAX HANDLERS =====
@@ -253,32 +292,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 echo json_encode(['success' => true, 'data' => $nutrition]);
                 break;
                 
-            case 'get_nutrition_history':
-                $days_back = min(14, max(1, intval($_POST['days_back'] ?? 7)));
-                $history = getNutritionHistory($pdo, $user_id, $days_back);
-                echo json_encode(['success' => true, 'data' => $history]);
-                break;
-
-            case 'get_date_nutrition':
-                $selected_date = $_POST['selected_date'] ?? $today;
-                
-                if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $selected_date)) {
+            case 'get_weekly_summary':
+                $week_start = $_POST['week_start'] ?? date('Y-m-d', strtotime('monday this week'));
+                if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $week_start)) {
                     echo json_encode(['success' => false, 'error' => 'Invalid date format']);
                     break;
                 }
+                $weekly = getWeeklyNutritionSummary($pdo, $user_id, $week_start);
+                echo json_encode(['success' => true, 'data' => $weekly]);
+                break;
                 
-                $daily = calculateDailyNutritionFromSubscription($pdo, $user_id, $selected_date);
-                $week_start = date('Y-m-d', strtotime('monday this week', strtotime($selected_date)));
-                $package = getWeeklyPackageOverview($pdo, $user_id, $week_start);
-                $goal_breakdown = getTodayGoalBreakdown($daily, $_SESSION['nutrition_goal'] ?? 'maintenance');
-                
-                echo json_encode([
-                    'success' => true,
-                    'date' => $selected_date,
-                    'daily_nutrition' => $daily,
-                    'package_overview' => $package,
-                    'goal_breakdown' => $goal_breakdown
-                ]);
+            case 'get_monthly_summary':
+                $month_start = $_POST['month_start'] ?? date('Y-m-01');
+                if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $month_start)) {
+                    echo json_encode(['success' => false, 'error' => 'Invalid date format']);
+                    break;
+                }
+                $monthly = getMonthlyNutritionSummary($pdo, $user_id, $month_start);
+                echo json_encode(['success' => true, 'data' => $monthly]);
                 break;
                 
             case 'set_nutrition_goal':
@@ -296,14 +327,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 
             case 'sync_latest_orders':
                 $sync_result = syncLatestOrdersToNutrition($pdo, $user_id);
-                $has_updates = $sync_result['synced_meals'] > 0;
-                
                 echo json_encode([
                     'success' => true,
-                    'updated' => $has_updates,
+                    'updated' => $sync_result['synced_meals'] > 0,
                     'synced_meals' => $sync_result['synced_meals'],
-                    'message' => $has_updates ? "Synced {$sync_result['synced_meals']} new meals" : "No new orders to sync",
-                    'timestamp' => $sync_result['timestamp']
+                    'message' => $sync_result['synced_meals'] > 0 ? 
+                        "Synced {$sync_result['synced_meals']} new meals" : "No new orders to sync"
                 ]);
                 break;
                 
@@ -323,545 +352,1105 @@ try {
     $database = new Database();
     $pdo = $database->getConnection();
     
-    // Get and validate selected date
+    // Get selected date and view
     $selected_date = $_GET['date'] ?? $today;
+    $view_type = $_GET['view'] ?? 'daily';
+    
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $selected_date)) {
         $selected_date = $today;
     }
     
-    // Ensure date is not in future and not too far back
+    // Ensure date is not in future
     if ($selected_date > $today) {
         $selected_date = $today;
     }
     
-    $min_date = date('Y-m-d', strtotime('-14 days'));
-    if ($selected_date < $min_date) {
-        $selected_date = $min_date;
-    }
-    
-    // Get data
+    // Get data based on view type
     $selected_nutrition = calculateDailyNutritionFromSubscription($pdo, $user_id, $selected_date);
-    $selected_week_start = date('Y-m-d', strtotime('monday this week', strtotime($selected_date)));
-    $package_overview = getWeeklyPackageOverview($pdo, $user_id, $selected_week_start);
-    $goal_breakdown = getTodayGoalBreakdown($selected_nutrition, $_SESSION['nutrition_goal'] ?? 'maintenance');
-    $nutrition_history = getNutritionHistory($pdo, $user_id, 7);
+    $weekly_summary = getWeeklyNutritionSummary($pdo, $user_id, date('Y-m-d', strtotime('monday this week', strtotime($selected_date))));
+    $monthly_summary = getMonthlyNutritionSummary($pdo, $user_id, date('Y-m-01', strtotime($selected_date)));
     
     // Get user info
     $stmt = $pdo->prepare("SELECT first_name, last_name FROM users WHERE id = ?");
     $stmt->execute([$user_id]);
     $user_info = $stmt->fetch(PDO::FETCH_ASSOC);
     
-    // Auto-sync (reduced frequency for production)
-    if (!isset($_POST['action']) && rand(1, 10) === 1) { // Only 10% of page loads
-        syncLatestOrdersToNutrition($pdo, $user_id);
-    }
 } catch (Exception $e) {
     error_log("Page load error: " . $e->getMessage());
     $error_message = "Unable to load nutrition data. Please try again later.";
     
     // Fallback data
     $selected_nutrition = ['calories' => 0, 'protein' => 0, 'meals_count' => 0, 'meals' => []];
-    $package_overview = null;
-    $goal_breakdown = ['coverage_percent' => 0, 'available_calories' => 0, 'target_calories' => 2000];
-    $nutrition_history = [];
+    $weekly_summary = null;
+    $monthly_summary = null;
     $user_info = ['first_name' => 'User'];
 }
 
-include 'header.php';
+$page_title = "Nutrition Tracking";
 ?>
+
 <!DOCTYPE html>
-<html lang="en-US">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nutrition Tracking - Krua Thai</title>
-    <meta name="description" content="Track your nutrition with healthy Thai meals delivered fresh">
-    <meta name="robots" content="noindex, nofollow">
-    
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <title><?php echo htmlspecialchars($page_title); ?> - Somdul Table</title>
+    <meta name="description" content="Track your nutrition with healthy Thai meals from Somdul Table">
     
     <style>
-    /* Production CSS - Minified base styles */
-    .container{max-width:1200px;margin:0 auto;padding:0 20px}
-    .main-content{padding-top:2rem;min-height:calc(100vh - 200px)}
-    .page-title{font-size:2.5rem;font-weight:700;text-align:center;margin-bottom:2rem;color:var(--brown,#8B4513)}
-    .page-title i{color:var(--curry,#CF723A);margin-right:0.5rem}
-    
-    .main-card{background:var(--white,#fff);border-radius:var(--radius-lg,12px);box-shadow:0 4px 12px rgba(0,0,0,0.1);overflow:hidden;position:relative;border:1px solid var(--border-light,#e1e5e9);margin-bottom:2rem}
-    .main-card::before{content:'';position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,var(--curry,#CF723A),var(--brown,#8B4513),var(--sage,#ADB89D))}
-    .card-header{padding:2rem;border-bottom:1px solid var(--border-light,#e1e5e9);background:linear-gradient(135deg,rgba(207,114,58,0.05),rgba(189,147,121,0.05))}
-    .card-title{font-size:1.5rem;font-weight:700;color:var(--brown,#8B4513);display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem}
-    .card-title i{color:var(--curry,#CF723A)}
-    .card-subtitle{color:var(--text-gray,#6c757d);font-size:1rem}
-    
-    /* Date Navigation */
-    .date-navigation{display:flex;align-items:center;justify-content:center;gap:1rem;margin:2rem 0;padding:1rem;background:var(--cream,#F5F1EB);border-radius:12px}
-    .nav-btn{background:var(--curry,#CF723A);color:white;border:none;padding:0.75rem 1rem;border-radius:8px;cursor:pointer;font-weight:600;transition:all 0.2s}
-    .nav-btn:hover:not(:disabled){background:var(--brown,#8B4513);transform:translateY(-1px)}
-    .nav-btn:disabled{background:#999;cursor:not-allowed}
-    .date-picker{text-align:center}
-    .date-picker input{padding:0.5rem;border:1px solid #ddd;border-radius:8px}
-    .date-picker label{display:block;font-weight:600;color:var(--brown,#8B4513);margin-top:0.5rem}
-    
-    /* Package Overview */
-    .package-overview{background:linear-gradient(135deg,rgba(207,114,58,0.05),rgba(189,147,121,0.05))}
-    .package-stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1.5rem;padding:2rem}
-    .package-stat{text-align:center;padding:1.5rem;background:white;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.1)}
-    .package-stat .stat-value{font-size:2rem;font-weight:700;color:var(--curry,#CF723A);margin-bottom:0.5rem}
-    .package-stat .stat-label{font-size:1rem;font-weight:600;color:var(--brown,#8B4513);margin-bottom:0.25rem}
-    .package-stat .stat-sub{font-size:0.85rem;color:#6c757d}
-    
-    /* Goal Breakdown */
-    .goal-comparison{padding:2rem}
-    .goal-circle{width:120px;height:120px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;position:relative;background:conic-gradient(var(--curry,#CF723A) 0%,#f0f0f0 0%)}
-    .goal-circle::before{content:'';width:80px;height:80px;background:white;border-radius:50%;position:absolute}
-    .goal-circle span{font-size:1.5rem;font-weight:700;color:var(--curry,#CF723A);z-index:1}
-    .goal-details{text-align:center}
-    .available{font-size:1.2rem;font-weight:700;color:var(--brown,#8B4513);margin-bottom:0.5rem}
-    .target,.remaining{color:#6c757d;margin-bottom:0.25rem}
-    
-    /* Meals Display */
-    .meals-section{padding:2rem;border-top:1px solid #e1e5e9}
-    .meals-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1.5rem;margin-top:1rem}
-    .meal-card{background:white;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);border:1px solid #e1e5e9;transition:all 0.2s;position:relative}
-    .meal-card:hover{transform:translateY(-2px);box-shadow:0 4px 16px rgba(0,0,0,0.15)}
-    .meal-number{position:absolute;top:0.75rem;left:0.75rem;background:var(--curry,#CF723A);color:white;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.85rem;z-index:2}
-    .meal-image-container{position:relative;width:100%;height:180px;overflow:hidden;background:linear-gradient(135deg,#F5F1EB,#ADB89D)}
-    .meal-image{width:100%;height:100%;object-fit:cover}
-    .meal-image-fallback{width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#6c757d;font-size:2.5rem;opacity:0.5}
-    .quantity-badge{position:absolute;top:0.75rem;right:0.75rem;background:rgba(0,0,0,0.8);color:white;padding:0.3rem 0.6rem;border-radius:4px;font-weight:600;font-size:0.8rem;z-index:2}
-    .meal-content{padding:1.25rem}
-    .meal-name{font-weight:700;color:#333;margin-bottom:0.3rem;font-size:1.05rem;line-height:1.3}
-    .meal-name-thai{color:#6c757d;font-size:0.9rem;font-style:italic;margin-bottom:0.75rem}
-    .meal-calories{display:flex;align-items:center;gap:0.5rem;font-size:1.1rem;font-weight:700;color:var(--curry,#CF723A);margin-bottom:1rem;padding:0.5rem;background:rgba(207,114,58,0.1);border-radius:8px}
-    .meal-calories i{color:#e74c3c}
-    .meal-nutrition-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:0.75rem}
-    .meal-nutrition-grid .nutrition-item{display:flex;align-items:center;gap:0.4rem;font-size:0.85rem;padding:0.4rem;background:#F5F1EB;border-radius:4px}
-    .meal-nutrition-grid .nutrition-item span{font-weight:600;color:#333}
-    .meal-nutrition-grid .nutrition-item small{color:#6c757d;font-size:0.75rem;margin-left:auto}
-    
-    /* History Chart */
-    .history-chart{display:grid;grid-template-columns:repeat(7,1fr);gap:1rem;padding:2rem}
-    .history-day{text-align:center;padding:1rem 0.5rem;border-radius:12px;cursor:pointer;transition:all 0.2s;background:#F5F1EB}
-    .history-day:hover{background:rgba(207,114,58,0.1);transform:translateY(-2px)}
-    .history-day.selected{background:var(--curry,#CF723A);color:white}
-    .history-bar{width:100%;height:8px;background:#ddd;border-radius:4px;margin:0.5rem 0;overflow:hidden}
-    .history-fill{height:100%;background:var(--curry,#CF723A);border-radius:4px;transition:width 0.6s ease}
-    .history-date{font-size:0.9rem;font-weight:600;margin-bottom:0.3rem}
-    .history-value{font-size:1.1rem;font-weight:700;color:var(--curry,#CF723A)}
-    .history-label{font-size:0.8rem;color:#6c757d}
-    
-    /* Empty State */
-    .empty-state{text-align:center;padding:3rem 2rem;color:#6c757d}
-    .empty-state i{font-size:3rem;margin-bottom:1rem;opacity:0.3}
-    .empty-state h3{font-size:1.3rem;margin-bottom:0.5rem;color:var(--brown,#8B4513);font-weight:700}
-    .empty-state p{font-size:1rem;margin-bottom:1.5rem}
-    .empty-state .btn{background:var(--curry,#CF723A);color:white;border:none;padding:1rem 2rem;border-radius:12px;text-decoration:none;font-weight:600;display:inline-flex;align-items:center;gap:0.5rem;transition:all 0.2s}
-    .empty-state .btn:hover{background:var(--brown,#8B4513);transform:translateY(-1px)}
-    
-    /* Loading */
-    .spinner{width:30px;height:30px;border:3px solid #f3f3f3;border-top:3px solid var(--curry,#CF723A);border-radius:50%;animation:spin 1s linear infinite;margin-right:1rem}
-    @keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
-    
-    /* Mobile Responsive */
-    @media (max-width: 768px){
-        .page-title{font-size:2rem;margin-bottom:1.5rem}
-        .date-navigation{flex-direction:column;gap:0.5rem}
-        .package-stat-grid{grid-template-columns:repeat(2,1fr);gap:1rem;padding:1rem}
-        .history-chart{grid-template-columns:repeat(4,1fr)}
-        .meals-grid{grid-template-columns:1fr}
-        .meal-nutrition-grid{grid-template-columns:1fr;gap:0.5rem}
-        .card-header{padding:1.5rem}
-        .goal-comparison{padding:1.5rem}
-        .meals-section{padding:1.5rem}
-        .meal-content{padding:1rem}
-        .meal-image-container{height:150px}
-        .meal-number{width:24px;height:24px;font-size:0.8rem;top:0.5rem;left:0.5rem}
-        .quantity-badge{top:0.5rem;right:0.5rem;padding:0.2rem 0.5rem;font-size:0.75rem}
-    }
-    @media (max-width: 480px){
-        .container{padding:0 15px}
-        .page-title{font-size:1.8rem}
-        .package-stat-grid{grid-template-columns:1fr;padding:1rem}
-        .history-chart{grid-template-columns:repeat(3,1fr);gap:0.5rem}
-        .nav-btn{padding:0.5rem 0.75rem;font-size:0.9rem}
-    }
-    /* Touch-friendly interactions */
-    @media (hover: none){
-        .meal-card:hover,.history-day:hover{transform:none}
-        .nav-btn:hover:not(:disabled){transform:none}
-    }
+        /* NUTRITION TRACKING SPECIFIC STYLES ONLY - Base styles come from header.php */
+        
+        /* Main Content Layout */
+        .main-content {
+            padding-top: 2rem;
+            min-height: calc(100vh - 100px);
+            padding-left: 2rem;
+            padding-right: 2rem;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* Page Header */
+        .page-header {
+            background: linear-gradient(135deg, var(--brown) 0%, var(--sage) 100%);
+            color: var(--white);
+            padding: 3rem 2rem;
+            margin-bottom: 3rem;
+            border-radius: var(--radius-lg);
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .page-header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="nutrition" width="50" height="50" patternUnits="userSpaceOnUse"><circle cx="25" cy="25" r="2" fill="white" opacity="0.1"/><circle cx="75" cy="75" r="2" fill="white" opacity="0.1"/></pattern></defs><rect width="100" height="100" fill="url(%23nutrition)"/></svg>');
+            opacity: 0.3;
+        }
+
+        .page-header-content {
+            position: relative;
+            z-index: 1;
+        }
+
+        .page-header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+        }
+
+        .page-header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+
+        /* View Tabs */
+        .view-tabs {
+            display: flex;
+            justify-content: center;
+            gap: 0.5rem;
+            margin: 2rem 0;
+            padding: 0.5rem;
+            background: var(--white);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-soft);
+        }
+
+        .tab-button {
+            padding: 1rem 2rem;
+            border: none;
+            background: transparent;
+            color: var(--text-gray);
+            font-weight: 600;
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            transition: var(--transition);
+            font-family: 'BaticaSans', sans-serif;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .tab-button:hover {
+            background: var(--cream);
+            color: var(--brown);
+        }
+
+        .tab-button.active {
+            background: var(--brown);
+            color: var(--white);
+            box-shadow: var(--shadow-soft);
+        }
+
+        /* Content Sections */
+        .content-section {
+            display: none;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        .content-section.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Cards */
+        .nutrition-card {
+            background: var(--white);
+            border-radius: var(--radius-lg);
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: var(--shadow-soft);
+            border: 1px solid rgba(189, 147, 121, 0.1);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid var(--cream);
+        }
+
+        .card-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--brown);
+            margin: 0;
+        }
+
+        .card-subtitle {
+            color: var(--text-gray);
+            margin: 0;
+            font-size: 1rem;
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 1.5rem;
+            background: var(--cream);
+            border-radius: var(--radius-md);
+            border: 2px solid transparent;
+            transition: var(--transition);
+        }
+
+        .stat-item:hover {
+            border-color: var(--brown);
+            transform: translateY(-2px);
+        }
+
+        .stat-value {
+            font-size: 2.2rem;
+            font-weight: 700;
+            color: var(--brown);
+            margin-bottom: 0.5rem;
+            display: block;
+        }
+
+        .stat-label {
+            font-weight: 600;
+            color: var(--text-dark);
+            margin-bottom: 0.25rem;
+        }
+
+        .stat-subtitle {
+            font-size: 0.9rem;
+            color: var(--text-gray);
+        }
+
+        /* Progress Bars */
+        .nutrition-progress {
+            margin: 2rem 0;
+        }
+
+        .progress-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            padding: 1rem;
+            background: var(--cream);
+            border-radius: var(--radius-md);
+        }
+
+        .progress-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            color: var(--white);
+        }
+
+        .progress-icon.protein { background: var(--curry); }
+        .progress-icon.carbs { background: var(--sage); }
+        .progress-icon.fat { background: var(--brown); }
+
+        .progress-info {
+            flex: 1;
+        }
+
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .progress-name {
+            font-weight: 600;
+            color: var(--text-dark);
+        }
+
+        .progress-value {
+            font-weight: 700;
+            color: var(--brown);
+        }
+
+        .progress-bar {
+            height: 8px;
+            background: var(--white);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--brown);
+            border-radius: 4px;
+            transition: width 0.6s ease;
+        }
+
+        /* Meals Display */
+        .meals-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .meal-card {
+            background: var(--white);
+            border-radius: var(--radius-md);
+            overflow: hidden;
+            box-shadow: var(--shadow-soft);
+            border: 1px solid rgba(189, 147, 121, 0.1);
+            transition: var(--transition);
+        }
+
+        .meal-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-medium);
+        }
+
+        .meal-image {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            background: linear-gradient(135deg, var(--cream), var(--sage));
+        }
+
+        .meal-content {
+            padding: 1.5rem;
+        }
+
+        .meal-name {
+            font-weight: 700;
+            color: var(--text-dark);
+            margin-bottom: 0.5rem;
+            font-size: 1.1rem;
+        }
+
+        .meal-category {
+            color: var(--curry);
+            font-size: 0.9rem;
+            margin-bottom: 1rem;
+            font-weight: 500;
+        }
+
+        .meal-nutrition {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.75rem;
+        }
+
+        .nutrition-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.9rem;
+            padding: 0.5rem;
+            background: var(--cream);
+            border-radius: var(--radius-sm);
+        }
+
+        /* Calendar View */
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 1rem;
+            margin: 2rem 0;
+        }
+
+        .calendar-day {
+            aspect-ratio: 1;
+            background: var(--white);
+            border-radius: var(--radius-md);
+            padding: 1rem;
+            text-align: center;
+            cursor: pointer;
+            transition: var(--transition);
+            border: 2px solid transparent;
+            position: relative;
+        }
+
+        .calendar-day:hover {
+            border-color: var(--brown);
+            transform: scale(1.05);
+        }
+
+        .calendar-day.active {
+            background: var(--brown);
+            color: var(--white);
+        }
+
+        .day-number {
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .day-calories {
+            font-size: 0.8rem;
+            color: var(--curry);
+            font-weight: 600;
+        }
+
+        /* Goal Setting */
+        .goal-selection {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .goal-option {
+            padding: 2rem;
+            background: var(--white);
+            border: 2px solid var(--cream);
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            transition: var(--transition);
+            text-align: center;
+        }
+
+        .goal-option:hover {
+            border-color: var(--brown);
+            transform: translateY(-2px);
+        }
+
+        .goal-option.selected {
+            background: var(--brown);
+            color: var(--white);
+            border-color: var(--brown);
+        }
+
+        .goal-emoji {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            display: block;
+        }
+
+        .goal-name {
+            font-weight: 700;
+            font-size: 1.2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .goal-description {
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 3rem 2rem;
+            color: var(--text-gray);
+        }
+
+        .empty-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        /* Date Navigation */
+        .date-navigation {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 2rem;
+            margin: 2rem 0;
+            padding: 1.5rem;
+            background: var(--white);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-soft);
+        }
+
+        .nav-button {
+            background: var(--brown);
+            color: var(--white);
+            border: none;
+            padding: 1rem 1.5rem;
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            font-weight: 600;
+            transition: var(--transition);
+        }
+
+        .nav-button:hover:not(:disabled) {
+            background: var(--curry);
+            transform: translateY(-1px);
+        }
+
+        .nav-button:disabled {
+            background: var(--text-gray);
+            cursor: not-allowed;
+        }
+
+        .date-display {
+            font-weight: 700;
+            font-size: 1.2rem;
+            color: var(--brown);
+        }
+
+        /* Loading States */
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            color: var(--text-gray);
+        }
+
+        .spinner {
+            width: 24px;
+            height: 24px;
+            border: 3px solid var(--cream);
+            border-top: 3px solid var(--brown);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 1rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Responsive Design */
+        @media (max-width: 1024px) {
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .meals-grid {
+                grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            }
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                padding: 1rem;
+            }
+            
+            .page-header {
+                padding: 2rem 1rem;
+                margin-bottom: 2rem;
+            }
+            
+            .page-header h1 {
+                font-size: 2rem;
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+            
+            .view-tabs {
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+            
+            .tab-button {
+                justify-content: center;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+            }
+            
+            .meals-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .date-navigation {
+                flex-direction: column;
+                gap: 1rem;
+            }
+            
+            .calendar-grid {
+                grid-template-columns: repeat(4, 1fr);
+                gap: 0.5rem;
+            }
+            
+            .goal-selection {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .nutrition-card {
+                padding: 1.5rem;
+                margin-bottom: 1.5rem;
+            }
+            
+            .page-header h1 {
+                font-size: 1.8rem;
+            }
+            
+            .calendar-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
     </style>
 </head>
 
+<!-- IMPORTANT: Add has-header class for proper spacing -->
 <body class="has-header">
-    <main class="main-content">
+    <!-- The header (promo banner + navbar + notifications) is already included from header.php -->
+
+    <div class="main-content">
         <div class="container">
-            <h1 class="page-title">
-                <i class="fas fa-chart-pie"></i>
-                Nutrition Tracking
-            </h1>
+            <!-- Page Header -->
+            <div class="page-header">
+                <div class="page-header-content">
+                    <h1>
+                        <span>🥗</span>
+                        Nutrition Tracking
+                    </h1>
+                    <p>Monitor your healthy Thai meal journey with comprehensive nutrition insights</p>
+                </div>
+            </div>
 
             <?php if (isset($error_message)): ?>
-                <div style="background:#f8d7da;color:#721c24;padding:1rem;border-radius:8px;margin-bottom:2rem;text-align:center">
-                    <i class="fas fa-exclamation-triangle"></i> <?= htmlspecialchars($error_message) ?>
-                </div>
-            <?php endif; ?>
-
-            <!-- Date Navigation -->
-            <div class="date-navigation">
-                <button onclick="navigateDate(-1)" class="nav-btn">
-                    <i class="fas fa-chevron-left"></i> Previous Day
-                </button>
-                <div class="date-picker">
-                    <input type="date" id="selectedDate" value="<?= htmlspecialchars($selected_date) ?>" 
-                           max="<?= htmlspecialchars($today) ?>" 
-                           min="<?= date('Y-m-d', strtotime('-14 days')) ?>"
-                           onchange="loadDateNutrition(this.value)">
-                    <label for="selectedDate">
-                        <?= date('l, M j, Y', strtotime($selected_date)) ?>
-                    </label>
-                </div>
-                <button onclick="navigateDate(1)" class="nav-btn" <?= $selected_date >= $today ? 'disabled' : '' ?>>
-                    Next Day <i class="fas fa-chevron-right"></i>
-                </button>
-            </div>
-
-            <!-- Level 1: Weekly Package Overview -->
-            <?php if ($package_overview): ?>
-            <div class="main-card package-overview">
-                <div class="card-header">
-                    <h2 class="card-title">
-                        <i class="fas fa-box"></i>
-                        Weekly Package Overview
-                    </h2>
-                    <p class="card-subtitle">
-                        <?= htmlspecialchars($package_overview['plan_name']) ?> 
-                        (<?= date('M j', strtotime($package_overview['week_start'])) ?> - 
-                         <?= date('M j', strtotime($package_overview['week_end'])) ?>)
-                    </p>
-                </div>
-                <div class="package-stat-grid">
-                    <div class="package-stat">
-                        <div class="stat-value"><?= number_format($package_overview['total_calories']) ?></div>
-                        <div class="stat-label">Total Calories</div>
-                        <div class="stat-sub">Available this week</div>
-                    </div>
-                    <div class="package-stat">
-                        <div class="stat-value"><?= $package_overview['total_meals'] ?></div>
-                        <div class="stat-label">Total Meals</div>
-                        <div class="stat-sub"><?= $package_overview['meals_per_week'] ?> planned</div>
-                    </div>
-                    <div class="package-stat">
-                        <div class="stat-value"><?= number_format($package_overview['avg_calories_per_day']) ?></div>
-                        <div class="stat-label">Avg per Day</div>
-                        <div class="stat-sub"><?= $package_overview['avg_protein_per_day'] ?>g protein</div>
-                    </div>
-                    <div class="package-stat">
-                        <div class="stat-value"><?= number_format($package_overview['total_protein']) ?>g</div>
-                        <div class="stat-label">Total Protein</div>
-                        <div class="stat-sub">For the week</div>
-                    </div>
-                </div>
+            <div class="nutrition-card" style="background: #f8d7da; border-color: #f5c6cb; color: #721c24;">
+                <p><strong>⚠️ <?= htmlspecialchars($error_message) ?></strong></p>
             </div>
             <?php endif; ?>
 
-            <!-- Level 2: Daily Goal Breakdown -->
-            <div class="main-card goal-breakdown">
-                <div class="card-header">
-                    <h2 class="card-title">
-                        <i class="fas fa-bullseye"></i>
-                        Daily Goal Breakdown
-                    </h2>
-                    <p class="card-subtitle">
-                        <?= $selected_date === $today ? 'Today' : date('l, M j', strtotime($selected_date)) ?> vs 
-                        <?= ucfirst($goal_breakdown['goal_type']) ?> Goal
-                    </p>
-                </div>
-                <div class="goal-comparison">
-                    <div class="goal-circle" style="background: conic-gradient(var(--curry,#CF723A) <?= $goal_breakdown['coverage_percent'] ?>%, #f0f0f0 0%)">
-                        <span><?= $goal_breakdown['coverage_percent'] ?>%</span>
-                    </div>
-                    <div class="goal-details">
-                        <div class="available"><?= number_format($goal_breakdown['available_calories']) ?> cal available</div>
-                        <div class="target">Target: <?= number_format($goal_breakdown['target_calories']) ?> cal</div>
-                        <?php if ($goal_breakdown['remaining_calories'] > 0): ?>
-                            <div class="remaining">Still need: <?= number_format($goal_breakdown['remaining_calories']) ?> cal</div>
-                        <?php else: ?>
-                            <div class="target" style="color: #27ae60; font-weight: 600;">Goal achieved!</div>
-                        <?php endif; ?>
-                    </div>
-                </div>
+            <!-- View Tabs -->
+            <div class="view-tabs">
+                <button class="tab-button active" data-view="daily">
+                    📅 Daily View
+                </button>
+                <button class="tab-button" data-view="weekly">
+                    📊 Weekly Summary
+                </button>
+                <button class="tab-button" data-view="monthly">
+                    📈 Monthly Overview
+                </button>
+                <button class="tab-button" data-view="goals">
+                    🎯 Goals & Settings
+                </button>
             </div>
 
-            <!-- Selected Day Meals -->
-            <?php if ($selected_nutrition['meals_count'] > 0): ?>
-            <div class="main-card">
-                <div class="card-header">
-                    <h2 class="card-title">
-                        <i class="fas fa-utensils"></i>
-                        <?= $selected_date === $today ? "Today's Meals" : "Meals for " . date('M j', strtotime($selected_date)) ?>
-                    </h2>
-                    <p class="card-subtitle">
-                        <?= $selected_nutrition['meals_count'] ?> meals providing <?= number_format($selected_nutrition['calories']) ?> calories
-                    </p>
+            <!-- Daily View -->
+            <div class="content-section active" id="daily-view">
+                <!-- Date Navigation -->
+                <div class="date-navigation">
+                    <button class="nav-button" onclick="navigateDate(-1)">
+                        ← Previous Day
+                    </button>
+                    <div class="date-display">
+                        <input type="date" id="selectedDate" value="<?= htmlspecialchars($selected_date) ?>" 
+                               max="<?= htmlspecialchars($today) ?>" 
+                               min="<?= date('Y-m-d', strtotime('-30 days')) ?>"
+                               onchange="loadDateNutrition(this.value)"
+                               style="border: none; background: transparent; color: var(--brown); font-weight: 700; font-size: 1.2rem;">
+                    </div>
+                    <button class="nav-button" onclick="navigateDate(1)" <?= $selected_date >= $today ? 'disabled' : '' ?>>
+                        Next Day →
+                    </button>
                 </div>
-                <div class="meals-section">
-                    <div class="meals-grid">
-                        <?php foreach ($selected_nutrition['meals'] as $index => $meal): ?>
-                            <div class="meal-card">
-                                <div class="meal-number"><?= $index + 1 ?></div>
-                                
-                                <div class="meal-image-container">
-                                    <?php if (!empty($meal['main_image_url'])): ?>
-                                        <img src="<?= htmlspecialchars($meal['main_image_url']) ?>" 
-                                             alt="<?= htmlspecialchars($meal['name'] ?? $meal['name_thai']) ?>" 
-                                             class="meal-image" 
-                                             loading="lazy"
-                                             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                                        <div class="meal-image-fallback" style="display: none;">
-                                            <i class="fas fa-utensils"></i>
-                                        </div>
-                                    <?php else: ?>
-                                        <div class="meal-image-fallback">
-                                            <i class="fas fa-utensils"></i>
-                                        </div>
-                                    <?php endif; ?>
-                                    
-                                    <?php if (intval($meal['quantity']) > 1): ?>
-                                        <div class="quantity-badge">×<?= intval($meal['quantity']) ?></div>
-                                    <?php endif; ?>
+
+                <!-- Daily Stats -->
+                <div class="nutrition-card">
+                    <div class="card-header">
+                        <div>
+                            <h2 class="card-title">Today's Nutrition Summary</h2>
+                            <p class="card-subtitle"><?= $selected_nutrition['message'] ?></p>
+                        </div>
+                    </div>
+                    
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <span class="stat-value"><?= number_format($selected_nutrition['calories']) ?></span>
+                            <div class="stat-label">Calories</div>
+                            <div class="stat-subtitle">From <?= $selected_nutrition['meals_count'] ?> meals</div>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value"><?= number_format($selected_nutrition['protein'], 1) ?>g</span>
+                            <div class="stat-label">Protein</div>
+                            <div class="stat-subtitle"><?= $selected_nutrition['protein_percent'] ?>% of goal</div>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value"><?= number_format($selected_nutrition['carbs'], 1) ?>g</span>
+                            <div class="stat-label">Carbohydrates</div>
+                            <div class="stat-subtitle"><?= $selected_nutrition['carbs_percent'] ?>% of goal</div>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value"><?= number_format($selected_nutrition['fat'], 1) ?>g</span>
+                            <div class="stat-label">Healthy Fats</div>
+                            <div class="stat-subtitle"><?= $selected_nutrition['fat_percent'] ?>% of goal</div>
+                        </div>
+                    </div>
+
+                    <!-- Progress Bars -->
+                    <div class="nutrition-progress">
+                        <div class="progress-item">
+                            <div class="progress-icon protein">🥩</div>
+                            <div class="progress-info">
+                                <div class="progress-header">
+                                    <span class="progress-name">Protein</span>
+                                    <span class="progress-value"><?= number_format($selected_nutrition['protein'], 1) ?>g / <?= $selected_nutrition['targets']['protein'] ?>g</span>
                                 </div>
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width: <?= min($selected_nutrition['protein_percent'], 100) ?>%"></div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="progress-item">
+                            <div class="progress-icon carbs">🍚</div>
+                            <div class="progress-info">
+                                <div class="progress-header">
+                                    <span class="progress-name">Carbohydrates</span>
+                                    <span class="progress-value"><?= number_format($selected_nutrition['carbs'], 1) ?>g / <?= $selected_nutrition['targets']['carbs'] ?>g</span>
+                                </div>
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width: <?= min($selected_nutrition['carbs_percent'], 100) ?>%"></div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="progress-item">
+                            <div class="progress-icon fat">🥑</div>
+                            <div class="progress-info">
+                                <div class="progress-header">
+                                    <span class="progress-name">Healthy Fats</span>
+                                    <span class="progress-value"><?= number_format($selected_nutrition['fat'], 1) ?>g / <?= $selected_nutrition['targets']['fat'] ?>g</span>
+                                </div>
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width: <?= min($selected_nutrition['fat_percent'], 100) ?>%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Today's Meals -->
+                <?php if ($selected_nutrition['meals_count'] > 0): ?>
+                <div class="nutrition-card">
+                    <div class="card-header">
+                        <h2 class="card-title">Your Thai Meals Today</h2>
+                        <p class="card-subtitle">Delicious and nutritious selections</p>
+                    </div>
+                    
+                    <div class="meals-grid">
+                        <?php foreach ($selected_nutrition['meals'] as $meal): ?>
+                            <div class="meal-card">
+                                <?php if (!empty($meal['main_image_url'])): ?>
+                                    <img src="<?= htmlspecialchars($meal['main_image_url']) ?>" 
+                                         alt="<?= htmlspecialchars($meal['name'] ?? $meal['name_thai']) ?>" 
+                                         class="meal-image" 
+                                         loading="lazy">
+                                <?php else: ?>
+                                    <div class="meal-image" style="display: flex; align-items: center; justify-content: center; color: var(--text-gray); font-size: 2rem;">
+                                        🍽️
+                                    </div>
+                                <?php endif; ?>
                                 
                                 <div class="meal-content">
                                     <div class="meal-name">
                                         <?= htmlspecialchars($meal['name'] ?? $meal['name_thai']) ?>
                                     </div>
                                     
-                                    <?php if (!empty($meal['name_thai']) && $meal['name'] !== $meal['name_thai']): ?>
-                                        <div class="meal-name-thai">
-                                            <?= htmlspecialchars($meal['name_thai']) ?>
-                                        </div>
+                                    <?php if (!empty($meal['category'])): ?>
+                                        <div class="meal-category"><?= htmlspecialchars($meal['category']) ?></div>
                                     <?php endif; ?>
                                     
-                                    <div class="meal-calories">
-                                        <i class="fas fa-fire"></i>
-                                        <?= number_format(floatval($meal['calories_per_serving']) * intval($meal['quantity'] ?: 1)) ?> cal
-                                    </div>
-                                    
-                                    <div class="meal-nutrition-grid">
+                                    <div class="meal-nutrition">
                                         <div class="nutrition-item">
-                                            <i class="fas fa-drumstick-bite" style="color: #8e44ad;"></i>
-                                            <span><?= number_format(floatval($meal['protein_g']) * intval($meal['quantity'] ?: 1), 1) ?>g</span>
-                                            <small>Protein</small>
+                                            <span>🔥</span>
+                                            <span><?= number_format(floatval($meal['calories_per_serving']) * intval($meal['quantity'] ?: 1)) ?> cal</span>
                                         </div>
                                         <div class="nutrition-item">
-                                            <i class="fas fa-bread-slice" style="color: #f39c12;"></i>
-                                            <span><?= number_format(floatval($meal['carbs_g']) * intval($meal['quantity'] ?: 1), 1) ?>g</span>
-                                            <small>Carbs</small>
+                                            <span>🥩</span>
+                                            <span><?= number_format(floatval($meal['protein_g']) * intval($meal['quantity'] ?: 1), 1) ?>g protein</span>
                                         </div>
                                         <div class="nutrition-item">
-                                            <i class="fas fa-tint" style="color: #27ae60;"></i>
-                                            <span><?= number_format(floatval($meal['fat_g']) * intval($meal['quantity'] ?: 1), 1) ?>g</span>
-                                            <small>Fat</small>
+                                            <span>🍚</span>
+                                            <span><?= number_format(floatval($meal['carbs_g']) * intval($meal['quantity'] ?: 1), 1) ?>g carbs</span>
                                         </div>
-                                        <?php if (floatval($meal['fiber_g']) > 0): ?>
                                         <div class="nutrition-item">
-                                            <i class="fas fa-leaf" style="color: #27ae60;"></i>
-                                            <span><?= number_format(floatval($meal['fiber_g']) * intval($meal['quantity'] ?: 1), 1) ?>g</span>
-                                            <small>Fiber</small>
+                                            <span>🥑</span>
+                                            <span><?= number_format(floatval($meal['fat_g']) * intval($meal['quantity'] ?: 1), 1) ?>g fat</span>
                                         </div>
-                                        <?php endif; ?>
                                     </div>
                                 </div>
                             </div>
                         <?php endforeach; ?>
                     </div>
                 </div>
-            </div>
-            <?php else: ?>
-            <div class="main-card">
-                <div class="empty-state">
-                    <i class="fas fa-utensils"></i>
-                    <h3>No Meals Scheduled</h3>
-                    <p>No meals are scheduled for <?= $selected_date === $today ? 'today' : 'this day' ?>.</p>
-                    <a href="subscribe.php" class="btn">
-                        <i class="fas fa-plus"></i>
-                        Order Meal Plan
-                    </a>
+                <?php else: ?>
+                <div class="nutrition-card">
+                    <div class="empty-state">
+                        <div class="empty-icon">🍽️</div>
+                        <h3>No Meals Scheduled</h3>
+                        <p>Add some delicious Thai meals to your plan for better nutrition tracking!</p>
+                        <a href="subscribe.php" class="btn btn-primary" style="margin-top: 1rem; display: inline-flex; align-items: center; gap: 0.5rem;">
+                            <span>🍜</span> Browse Meal Plans
+                        </a>
+                    </div>
                 </div>
+                <?php endif; ?>
             </div>
-            <?php endif; ?>
 
-            <!-- Historical View -->
-            <?php if (!empty($nutrition_history)): ?>
-            <div class="main-card">
-                <div class="card-header">
-                    <h2 class="card-title">
-                        <i class="fas fa-history"></i>
-                        Nutrition History (7 Days)
-                    </h2>
-                    <p class="card-subtitle">
-                        Click any day to view detailed nutrition information
-                    </p>
+            <!-- Weekly View -->
+            <div class="content-section" id="weekly-view">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    Loading weekly data...
                 </div>
-                <div class="history-chart">
-                    <?php foreach ($nutrition_history as $date => $day_data): ?>
-                        <div class="history-day <?= $date === $selected_date ? 'selected' : '' ?>" 
-                             onclick="loadDateNutrition('<?= $date ?>')"
-                             role="button"
-                             tabindex="0"
-                             onkeydown="if(event.key==='Enter')loadDateNutrition('<?= $date ?>')">
-                            <div class="history-date"><?= date('M j', strtotime($date)) ?></div>
-                            <div class="history-bar">
-                                <div class="history-fill" style="width: <?= min((intval($day_data['calories']) / 2000) * 100, 100) ?>%"></div>
+            </div>
+
+            <!-- Monthly View -->
+            <div class="content-section" id="monthly-view">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    Loading monthly data...
+                </div>
+            </div>
+
+            <!-- Goals View -->
+            <div class="content-section" id="goals-view">
+                <div class="nutrition-card">
+                    <div class="card-header">
+                        <h2 class="card-title">Nutrition Goals</h2>
+                        <p class="card-subtitle">Choose a goal that supports your health and wellbeing</p>
+                    </div>
+                    
+                    <div class="goal-selection">
+                        <div class="goal-option <?= ($_SESSION['nutrition_goal'] ?? 'maintenance') === 'maintenance' ? 'selected' : '' ?>" 
+                             onclick="setNutritionGoal('maintenance', this)">
+                            <span class="goal-emoji">⚖️</span>
+                            <div class="goal-name">Balanced Maintenance</div>
+                            <div class="goal-description">
+                                2,000 calories daily with balanced macronutrients for overall health and energy
                             </div>
-                            <div class="history-value"><?= number_format($day_data['calories']) ?></div>
-                            <div class="history-label">cal</div>
                         </div>
-                    <?php endforeach; ?>
-                </div>
-            </div>
-            <?php endif; ?>
-
-            <!-- Goal Setting -->
-            <div class="main-card">
-                <div class="card-header">
-                    <h2 class="card-title">
-                        <i class="fas fa-target"></i>
-                        Nutrition Goals
-                    </h2>
-                    <p class="card-subtitle">
-                        Set your nutrition targets to track progress effectively
-                    </p>
-                </div>
-                <div style="padding: 2rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
-                    <div class="goal-btn <?= ($_SESSION['nutrition_goal'] ?? '') === 'weight_loss' ? 'selected' : '' ?>" 
-                         onclick="setNutritionGoal('weight_loss', this)"
-                         style="padding: 1rem; border: 2px solid #ddd; border-radius: 12px; background: white; cursor: pointer; text-align: center; transition: all 0.2s; <?= ($_SESSION['nutrition_goal'] ?? '') === 'weight_loss' ? 'border-color: #CF723A; background: #CF723A; color: white;' : '' ?>">
-                        <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">🏃‍♀️</div>
-                        <div style="font-size: 1rem; margin-bottom: 0.3rem; font-weight: 600;">Weight Loss</div>
-                        <div style="font-size: 0.8rem; opacity: 0.8;">1,600 calories, High protein</div>
-                    </div>
-                    
-                    <div class="goal-btn <?= ($_SESSION['nutrition_goal'] ?? 'maintenance') === 'maintenance' ? 'selected' : '' ?>" 
-                         onclick="setNutritionGoal('maintenance', this)"
-                         style="padding: 1rem; border: 2px solid #ddd; border-radius: 12px; background: white; cursor: pointer; text-align: center; transition: all 0.2s; <?= ($_SESSION['nutrition_goal'] ?? 'maintenance') === 'maintenance' ? 'border-color: #CF723A; background: #CF723A; color: white;' : '' ?>">
-                        <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">⚖️</div>
-                        <div style="font-size: 1rem; margin-bottom: 0.3rem; font-weight: 600;">Maintenance</div>
-                        <div style="font-size: 0.8rem; opacity: 0.8;">2,000 calories, Balanced</div>
-                    </div>
-                    
-                    <div class="goal-btn <?= ($_SESSION['nutrition_goal'] ?? '') === 'muscle_gain' ? 'selected' : '' ?>" 
-                         onclick="setNutritionGoal('muscle_gain', this)"
-                         style="padding: 1rem; border: 2px solid #ddd; border-radius: 12px; background: white; cursor: pointer; text-align: center; transition: all 0.2s; <?= ($_SESSION['nutrition_goal'] ?? '') === 'muscle_gain' ? 'border-color: #CF723A; background: #CF723A; color: white;' : '' ?>">
-                        <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">💪</div>
-                        <div style="font-size: 1rem; margin-bottom: 0.3rem; font-weight: 600;">Muscle Gain</div>
-                        <div style="font-size: 0.8rem; opacity: 0.8;">2,400 calories, High protein</div>
-                    </div>
-                    
-                    <div class="goal-btn <?= ($_SESSION['nutrition_goal'] ?? '') === 'healthy_thai' ? 'selected' : '' ?>" 
-                         onclick="setNutritionGoal('healthy_thai', this)"
-                         style="padding: 1rem; border: 2px solid #ddd; border-radius: 12px; background: white; cursor: pointer; text-align: center; transition: all 0.2s; <?= ($_SESSION['nutrition_goal'] ?? '') === 'healthy_thai' ? 'border-color: #CF723A; background: #CF723A; color: white;' : '' ?>">
-                        <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">🇹🇭</div>
-                        <div style="font-size: 1rem; margin-bottom: 0.3rem; font-weight: 600;">Healthy Thai</div>
-                        <div style="font-size: 0.8rem; opacity: 0.8;">1,800 calories, Thai-focused</div>
+                        
+                        <div class="goal-option <?= ($_SESSION['nutrition_goal'] ?? '') === 'healthy_thai' ? 'selected' : '' ?>" 
+                             onclick="setNutritionGoal('healthy_thai', this)">
+                            <span class="goal-emoji">🇹🇭</span>
+                            <div class="goal-name">Healthy Thai Focus</div>
+                            <div class="goal-description">
+                                1,800 calories featuring traditional Thai nutrition wisdom with modern health insights
+                            </div>
+                        </div>
+                        
+                        <div class="goal-option <?= ($_SESSION['nutrition_goal'] ?? '') === 'weight_loss' ? 'selected' : '' ?>" 
+                             onclick="setNutritionGoal('weight_loss', this)">
+                            <span class="goal-emoji">🌱</span>
+                            <div class="goal-name">Mindful Eating</div>
+                            <div class="goal-description">
+                                1,600 calories with emphasis on nutrition density and mindful portion control
+                            </div>
+                        </div>
+                        
+                        <div class="goal-option <?= ($_SESSION['nutrition_goal'] ?? '') === 'muscle_gain' ? 'selected' : '' ?>" 
+                             onclick="setNutritionGoal('muscle_gain', this)">
+                            <span class="goal-emoji">💪</span>
+                            <div class="goal-name">Active Lifestyle</div>
+                            <div class="goal-description">
+                                2,400 calories with higher protein to support an active, fitness-focused lifestyle
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
-    </main>
-
-    <!-- Loading Modal -->
-    <div id="loadingModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999; align-items: center; justify-content: center;">
-        <div style="background: white; padding: 2rem; border-radius: 1rem; text-align: center;">
-            <div class="spinner"></div>
-            <div style="margin-top: 1rem; color: #333;">Loading nutrition data...</div>
         </div>
     </div>
 
     <script>
+        // Nutrition Tracking JavaScript
+        let currentView = 'daily';
+        let selectedDate = '<?= $selected_date ?>';
+
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('Nutrition Tracking loaded');
-            initializePage();
+            initializeNutritionTracking();
         });
 
-        function initializePage() {
-            const cards = document.querySelectorAll('.main-card');
-            cards.forEach((card, index) => {
-                card.style.opacity = '0';
-                card.style.transform = 'translateY(20px)';
-                setTimeout(() => {
-                    card.style.transition = 'all 0.6s ease';
-                    card.style.opacity = '1';
-                    card.style.transform = 'translateY(0)';
-                }, index * 100);
-            });
+        function initializeNutritionTracking() {
+            console.log('Nutrition Tracking initialized');
+            
+            // Setup tab switching
+            setupTabs();
+            
+            // Setup date navigation
+            setupDateNavigation();
+            
+            // Load initial data
+            loadWeeklyData();
+            loadMonthlyData();
+            
+            // Setup auto-refresh
+            setupAutoRefresh();
+        }
 
-            // Add hover effects for goal buttons
-            document.querySelectorAll('.goal-btn').forEach(btn => {
-                if (!btn.classList.contains('selected')) {
-                    btn.addEventListener('mouseenter', function() {
-                        this.style.borderColor = '#CF723A';
-                        this.style.background = 'rgba(207, 114, 58, 0.05)';
-                        this.style.transform = 'translateY(-2px)';
-                    });
-                    btn.addEventListener('mouseleave', function() {
-                        this.style.borderColor = '#ddd';
-                        this.style.background = 'white';
-                        this.style.transform = 'translateY(0)';
-                    });
-                }
+        function setupTabs() {
+            const tabButtons = document.querySelectorAll('.tab-button');
+            const contentSections = document.querySelectorAll('.content-section');
+            
+            tabButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    const viewType = button.getAttribute('data-view');
+                    switchView(viewType);
+                });
             });
         }
 
+        function switchView(viewType) {
+            // Update active tab
+            document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+            document.querySelector(`[data-view="${viewType}"]`).classList.add('active');
+            
+            // Update active content
+            document.querySelectorAll('.content-section').forEach(section => section.classList.remove('active'));
+            document.getElementById(`${viewType}-view`).classList.add('active');
+            
+            currentView = viewType;
+            
+            // Load data if needed
+            if (viewType === 'weekly') {
+                loadWeeklyData();
+            } else if (viewType === 'monthly') {
+                loadMonthlyData();
+            }
+        }
+
+        function setupDateNavigation() {
+            // Date input change handler is already inline
+        }
+
         function navigateDate(direction) {
-            const currentDate = document.getElementById('selectedDate').value;
-            const newDate = new Date(currentDate);
-            newDate.setDate(newDate.getDate() + direction);
+            const currentDate = new Date(selectedDate);
+            currentDate.setDate(currentDate.getDate() + direction);
             
             const today = new Date();
             const minDate = new Date();
-            minDate.setDate(today.getDate() - 14);
+            minDate.setDate(today.getDate() - 30);
             
-            if (newDate <= today && newDate >= minDate) {
-                loadDateNutrition(newDate.toISOString().split('T')[0]);
+            if (currentDate <= today && currentDate >= minDate) {
+                const newDateStr = currentDate.toISOString().split('T')[0];
+                loadDateNutrition(newDateStr);
             }
         }
 
         function loadDateNutrition(date) {
-            showLoading();
+            selectedDate = date;
+            document.getElementById('selectedDate').value = date;
             
+            // Update URL
             const url = new URL(window.location);
             url.searchParams.set('date', date);
             window.history.pushState({}, '', url);
             
-            document.getElementById('selectedDate').value = date;
+            // Refresh page with new date
+            window.location.reload();
+        }
+
+        function loadWeeklyData() {
+            const weeklyView = document.getElementById('weekly-view');
             
             fetch('', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: 'action=get_date_nutrition&selected_date=' + encodeURIComponent(date)
+                body: 'action=get_weekly_summary&week_start=' + encodeURIComponent(getMonday(selectedDate))
             })
             .then(response => response.json())
             .then(data => {
-                hideLoading();
-                if (data.success) {
-                    window.location.reload();
+                if (data.success && data.data) {
+                    renderWeeklyView(data.data);
                 } else {
-                    showNotification('Failed to load nutrition data', 'error');
+                    weeklyView.innerHTML = '<div class="empty-state"><h3>Unable to load weekly data</h3></div>';
                 }
             })
             .catch(error => {
-                hideLoading();
-                console.error('Error:', error);
-                showNotification('Network error', 'error');
+                console.error('Weekly data error:', error);
+                weeklyView.innerHTML = '<div class="empty-state"><h3>Error loading weekly data</h3></div>';
             });
         }
 
-        function setNutritionGoal(goalType, clickedElement) {
-            showLoading();
+        function loadMonthlyData() {
+            const monthlyView = document.getElementById('monthly-view');
             
+            fetch('', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'action=get_monthly_summary&month_start=' + encodeURIComponent(getMonthStart(selectedDate))
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.data) {
+                    renderMonthlyView(data.data);
+                } else {
+                    monthlyView.innerHTML = '<div class="empty-state"><h3>Unable to load monthly data</h3></div>';
+                }
+            })
+            .catch(error => {
+                console.error('Monthly data error:', error);
+                monthlyView.innerHTML = '<div class="empty-state"><h3>Error loading monthly data</h3></div>';
+            });
+        }
+
+        function renderWeeklyView(weeklyData) {
+            const weeklyView = document.getElementById('weekly-view');
+            
+            const html = `
+                <div class="nutrition-card">
+                    <div class="card-header">
+                        <h2 class="card-title">Weekly Summary</h2>
+                        <p class="card-subtitle">${formatDateRange(weeklyData.week_start, weeklyData.week_end)}</p>
+                    </div>
+                    
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <span class="stat-value">${weeklyData.totals.calories.toLocaleString()}</span>
+                            <div class="stat-label">Total Calories</div>
+                            <div class="stat-subtitle">${weeklyData.averages.calories}/day average</div>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value">${weeklyData.totals.protein.toFixed(0)}g</span>
+                            <div class="stat-label">Total Protein</div>
+                            <div class="stat-subtitle">${weeklyData.averages.protein}g/day average</div>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value">${weeklyData.totals.meals}</span>
+                            <div class="stat-label">Total Meals</div>
+                            <div class="stat-subtitle">${weeklyData.averages.meals}/day average</div>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value">${weeklyData.totals.fiber.toFixed(0)}g</span>
+                            <div class="stat-label">Total Fiber</div>
+                            <div class="stat-subtitle">${weeklyData.averages.fiber}g/day average</div>
+                        </div>
+                    </div>
+                    
+                    ${renderWeeklyChart(weeklyData.daily_data)}
+                </div>
+            `;
+            
+            weeklyView.innerHTML = html;
+        }
+
+        function renderMonthlyView(monthlyData) {
+            const monthlyView = document.getElementById('monthly-view');
+            
+            const html = `
+                <div class="nutrition-card">
+                    <div class="card-header">
+                        <h2 class="card-title">Monthly Overview</h2>
+                        <p class="card-subtitle">${formatMonth(monthlyData.month_start)} - ${monthlyData.active_days} active days</p>
+                    </div>
+                    
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <span class="stat-value">${monthlyData.totals.calories.toLocaleString()}</span>
+                            <div class="stat-label">Total Calories</div>
+                            <div class="stat-subtitle">${monthlyData.averages.calories}/day average</div>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value">${monthlyData.totals.protein.toFixed(0)}g</span>
+                            <div class="stat-label">Total Protein</div>
+                            <div class="stat-subtitle">${monthlyData.averages.protein}g/day average</div>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value">${monthlyData.totals.meals}</span>
+                            <div class="stat-label">Total Meals</div>
+                            <div class="stat-subtitle">${monthlyData.active_days}/${monthlyData.days_in_month} days active</div>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value">${Math.round((monthlyData.active_days / monthlyData.days_in_month) * 100)}%</span>
+                            <div class="stat-label">Consistency</div>
+                            <div class="stat-subtitle">Days with meals tracked</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            monthlyView.innerHTML = html;
+        }
+
+        function renderWeeklyChart(dailyData) {
+            const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+            let chartHtml = '<div class="calendar-grid" style="margin-top: 2rem;">';
+            
+            Object.keys(dailyData).forEach((date, index) => {
+                const dayData = dailyData[date];
+                const dayName = days[index] || days[index % 7];
+                const isActive = date === selectedDate;
+                
+                chartHtml += `
+                    <div class="calendar-day ${isActive ? 'active' : ''}" onclick="loadDateNutrition('${date}')">
+                        <div class="day-number">${dayName.substr(0, 3)}</div>
+                        <div class="day-number">${new Date(date).getDate()}</div>
+                        <div class="day-calories">${dayData.calories.toLocaleString()} cal</div>
+                    </div>
+                `;
+            });
+            
+            chartHtml += '</div>';
+            return chartHtml;
+        }
+
+        function setNutritionGoal(goalType, element) {
             fetch('', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -869,22 +1458,14 @@ include 'header.php';
             })
             .then(response => response.json())
             .then(data => {
-                hideLoading();
                 if (data.success) {
-                    document.querySelectorAll('.goal-btn').forEach(btn => {
-                        btn.classList.remove('selected');
-                        btn.style.borderColor = '#ddd';
-                        btn.style.background = 'white';
-                        btn.style.color = '#333';
-                    });
+                    // Update UI
+                    document.querySelectorAll('.goal-option').forEach(opt => opt.classList.remove('selected'));
+                    element.classList.add('selected');
                     
-                    clickedElement.classList.add('selected');
-                    clickedElement.style.borderColor = '#CF723A';
-                    clickedElement.style.background = '#CF723A';
-                    clickedElement.style.color = 'white';
+                    showNotification('Nutrition goal updated successfully! 🎯', 'success');
                     
-                    showNotification('Goal updated successfully!', 'success');
-                    
+                    // Refresh after a delay
                     setTimeout(() => {
                         window.location.reload();
                     }, 1500);
@@ -893,18 +1474,57 @@ include 'header.php';
                 }
             })
             .catch(error => {
-                hideLoading();
-                console.error('Error:', error);
+                console.error('Goal update error:', error);
                 showNotification('Network error', 'error');
             });
         }
 
-        function showLoading() {
-            document.getElementById('loadingModal').style.display = 'flex';
+        function setupAutoRefresh() {
+            // Periodic sync check (reduced frequency)
+            setInterval(async function() {
+                if (!document.hidden && Math.random() < 0.1) {
+                    try {
+                        const response = await fetch('', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                            body: 'action=sync_latest_orders'
+                        });
+                        const data = await response.json();
+                        
+                        if (data.success && data.updated && data.synced_meals > 0) {
+                            showNotification(`Added ${data.synced_meals} new meals to tracking`, 'success');
+                        }
+                    } catch (error) {
+                        console.log('Auto-sync check failed:', error);
+                    }
+                }
+            }, 5 * 60 * 1000);
         }
 
-        function hideLoading() {
-            document.getElementById('loadingModal').style.display = 'none';
+        // Utility functions
+        function getMonday(dateStr) {
+            const date = new Date(dateStr);
+            const day = date.getDay();
+            const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+            const monday = new Date(date.setDate(diff));
+            return monday.toISOString().split('T')[0];
+        }
+
+        function getMonthStart(dateStr) {
+            const date = new Date(dateStr);
+            return new Date(date.getFullYear(), date.getMonth(), 1).toISOString().split('T')[0];
+        }
+
+        function formatDateRange(start, end) {
+            const startDate = new Date(start);
+            const endDate = new Date(end);
+            const options = { month: 'short', day: 'numeric' };
+            return `${startDate.toLocaleDateString('en-US', options)} - ${endDate.toLocaleDateString('en-US', options)}`;
+        }
+
+        function formatMonth(dateStr) {
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
         }
 
         function showNotification(message, type = 'info') {
@@ -923,13 +1543,13 @@ include 'header.php';
                 background: ${colors[type]};
                 color: white;
                 padding: 1rem 1.5rem;
-                border-radius: 8px;
+                border-radius: 12px;
                 font-weight: 600;
                 z-index: 10000;
                 box-shadow: 0 4px 12px rgba(0,0,0,0.2);
                 transform: translateX(100%);
                 transition: transform 0.3s ease;
-                max-width: 300px;
+                max-width: 320px;
             `;
             notification.textContent = message;
             
@@ -944,41 +1564,10 @@ include 'header.php';
                 setTimeout(() => {
                     notification.remove();
                 }, 300);
-            }, 3000);
+            }, 4000);
         }
 
-        // Keyboard navigation
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') {
-                const modals = document.querySelectorAll('[style*="position: fixed"]');
-                modals.forEach(modal => {
-                    if (modal.id !== 'loadingModal') {
-                        modal.remove();
-                    }
-                });
-            }
-        });
-
-        // Auto-sync check (reduced frequency for production)
-        setInterval(async function() {
-            if (!document.hidden && Math.random() < 0.1) { // 10% chance every 5 minutes
-                try {
-                    const response = await fetch('', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                        body: 'action=sync_latest_orders'
-                    });
-                    const data = await response.json();
-                    
-                    if (data.success && data.updated && data.synced_meals > 0) {
-                        showNotification(`Added ${data.synced_meals} new meals to tracking`, 'success');
-                        setTimeout(() => window.location.reload(), 2000);
-                    }
-                } catch (error) {
-                    console.log('Auto-sync failed:', error);
-                }
-            }
-        }, 5 * 60 * 1000); // Check every 5 minutes
+        console.log('Somdul Table Nutrition Tracking loaded successfully! 🥗');
     </script>
 </body>
 </html>
